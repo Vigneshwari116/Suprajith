@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:svenska/core/constants/app_mode.dart';
+import 'package:svenska/core/services/auth_service.dart';
+import 'package:svenska/injection.dart';
 import '../../../../core/utils/routes_name.dart';
 
 class WorkstationShell extends StatefulWidget {
@@ -39,15 +42,33 @@ class _WorkstationShellState extends State<WorkstationShell> {
 
   void _navigate(BuildContext context, String route) {
     context.go(route);
-    final onMain = route == AppRoutes.workstationMain;
-    setState(() => _menuExpanded = !onMain);
+    setState(() => _menuExpanded = false);
+  }
+
+  Future<void> _confirmLogout(BuildContext context) async {
+    final yes = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Log out?'),
+        content: const Text('Do you want to log out?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('No')),
+          ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Yes')),
+        ],
+      ),
+    );
+    if (yes != true || !context.mounted) return;
+    if (kUseLocalDataStore) {
+      sl<AuthService>().logout();
+    }
+    setState(() => _menuExpanded = false);
+    context.go(AppRoutes.login);
   }
 
   @override
   Widget build(BuildContext context) {
     final location = GoRouterState.of(context).uri.toString();
     final selected = _selectedIndex(location);
-    final onMainScreen = selected == 0;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
@@ -127,6 +148,12 @@ class _WorkstationShellState extends State<WorkstationShell> {
                           selected: selected == 4,
                           onTap: () => _navigate(context, AppRoutes.workstationBackup),
                         ),
+                        if (kUseLocalDataStore)
+                          _NavTab(
+                            label: 'Logout',
+                            selected: false,
+                            onTap: () => _confirmLogout(context),
+                          ),
                       ],
                     ),
                   ],

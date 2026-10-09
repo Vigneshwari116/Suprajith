@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_mode.dart';
+import '../../../../core/services/auth_service.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/services/client_discovery_helper.dart';
 import '../../../../core/services/server_config_storage.dart';
@@ -29,9 +30,12 @@ class _SplashPageState extends State<SplashPage> {
 
   Future<void> _startAppFlow() async {
     if (kUseLocalDataStore) {
+      AuthService.ensureDefaultCredentials();
       await Future<void>.delayed(const Duration(milliseconds: 400));
       if (!mounted) return;
-      context.go(AppRoutes.workstationMain);
+      final destination =
+          sl<AuthService>().isLoggedIn() ? AppRoutes.workstationMain : AppRoutes.login;
+      context.go(destination);
       return;
     }
 
