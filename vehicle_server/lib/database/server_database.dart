@@ -120,10 +120,6 @@ class ServerDatabase {
   }
 
   static void saveMaster(Map<String, dynamic> data) {
-    final showArrow = data['show_keep_up_arrow'] == true ||
-        data['show_keep_up_arrow'] == 1 ||
-        data['show_keep_up_arrow']?.toString() == '1';
-
     final stmt = db.prepare('''
       INSERT INTO vehicle_master (vehicle_model, customer_part_no, part_no, date_of_mfg, fixed_qr_code, company_logo, show_keep_up_arrow)
       VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -142,7 +138,7 @@ class ServerDatabase {
       data['date_of_mfg'] ?? '',
       data['fixed_qr_code'] ?? '0000ND22211000020365',
       data['company_logo'] ?? 'none',
-      showArrow ? 1 : 0,
+      0,
     ]);
     stmt.dispose();
   }

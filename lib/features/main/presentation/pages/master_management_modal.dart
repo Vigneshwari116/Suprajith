@@ -32,7 +32,6 @@ class _MasterManagementModalState extends State<MasterManagementModal> {
   String? _qrValidationError;
 
   String _selectedLogoKey = 'suprajit';
-  bool _showKeepUpArrow = false;
 
   final List<Map<String, String>> _availableLogos = [
     {'key': 'suprajit', 'label': 'Suprajit'},
@@ -105,7 +104,6 @@ class _MasterManagementModalState extends State<MasterManagementModal> {
           : DateFormat('dd.MM.yyyy').format(DateTime.now());
       _fixedQrCtrl.text = item.fixedQrCode;
       _selectedLogoKey = item.companyLogo.isNotEmpty ? item.companyLogo : 'suprajit';
-      _showKeepUpArrow = item.showKeepUpArrow;
       _qrValidationError = null;
     });
     _showToast("Loaded: ${item.vehicleModel} into form");
@@ -159,7 +157,6 @@ class _MasterManagementModalState extends State<MasterManagementModal> {
           'date_of_mfg': _mfgDateCtrl.text.trim(),
           'fixed_qr_code': fixedQr,
           'company_logo': _selectedLogoKey,
-          'show_keep_up_arrow': _showKeepUpArrow,
         },
       );
 
@@ -172,7 +169,6 @@ class _MasterManagementModalState extends State<MasterManagementModal> {
         _fixedQrCtrl.clear();
         setState(() {
           _selectedLogoKey = 'suprajit';
-          _showKeepUpArrow = false;
           _qrValidationError = null;
         });
         _fnModel.requestFocus();
@@ -314,7 +310,6 @@ class _MasterManagementModalState extends State<MasterManagementModal> {
                     _partCtrl.clear();
                     _fixedQrCtrl.clear();
                     _mfgDateCtrl.text = DateFormat('dd.MM.yyyy').format(DateTime.now());
-                    _showKeepUpArrow = false;
                     _qrValidationError = null;
                   });
                 },
@@ -426,19 +421,7 @@ class _MasterManagementModalState extends State<MasterManagementModal> {
             },
           ),
         ),
-        const SizedBox(height: 10),
-        CheckboxListTile(
-          contentPadding: EdgeInsets.zero,
-          dense: true,
-          controlAffinity: ListTileControlAffinity.leading,
-          title: const Text(
-            "Arrow + Keep Up Right + Made in India",
-            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black),
-          ),
-          value: _showKeepUpArrow,
-          onChanged: (val) => setState(() => _showKeepUpArrow = val ?? false),
-        ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 16),
         SizedBox(
           width: double.infinity,
           height: 38,

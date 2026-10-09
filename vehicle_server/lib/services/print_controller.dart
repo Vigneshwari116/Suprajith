@@ -133,8 +133,6 @@ class PrintController {
         'part_no': master['part_no'] ?? '',
         'mfg_date': master['date_of_mfg'] ?? '',
         'company_logo': master['company_logo'] ?? 'none',
-        'show_keep_up_arrow': (master['show_keep_up_arrow'] == 1 ||
-            master['show_keep_up_arrow'] == true),
       });
     } catch (e) {
       return jsonRes({'status': 'error', 'message': e.toString()}, statusCode: 500);

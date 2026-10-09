@@ -16,6 +16,7 @@ import 'frontend_label_engine.dart';
 import 'logo_assets_resolver.dart';
 import 'master_management_modal.dart';
 import '../../../../core/constants/label_config.dart';
+import 'u350_label_preview.dart';
 
 // THEME & COLOR PALETTE
 const Color kAppBg = Color(0xFFF1F5F9);
@@ -300,7 +301,6 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
             mfgDate: formattedDate,
             qrPayload: fullPayload,
             logoImage: logoImage,
-            showKeepUpArrow: matched.showKeepUpArrow,
           );
         }
 
@@ -319,7 +319,6 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
           'sn': serialStr,
           'size': _selectedLabelSize,
           'logo': matched.companyLogo,
-          'show_keep_up_arrow': matched.showKeepUpArrow ? '1' : '0',
         };
 
         if (mounted) {
@@ -730,6 +729,27 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
     final String logoKey = item['logo'] ?? 'none';
     final String? logoPath = _resolveAssetLogoPath(logoKey);
 
+    if (showKeepUpExtras(model)) {
+      return Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: Colors.black, width: 1.2),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 4, offset: const Offset(0, 2)),
+          ],
+        ),
+        child: U350LabelPreview(
+          model: model,
+          customerPartNo: custPart,
+          partNo: part,
+          mfgDate: mfg,
+          qrData: qrData,
+          logoAssetPath: logoPath,
+        ),
+      );
+    }
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -1132,13 +1152,21 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
                     ConstrainedBox(
                       constraints: BoxConstraints(
                         maxWidth: _selectedLabelSize == '100x50' ? 460 : 380,
-                        maxHeight: _selectedLabelSize == '100x50' ? 240 : 160,
+                        maxHeight: _selectedLabelSize == '100x50'
+                            ? 240
+                            : (showKeepUpExtras(_activeLabelData!['model'] ?? '') ? 200 : 160),
                       ),
                       child: FittedBox(
                         fit: BoxFit.scaleDown,
                         child: _selectedLabelSize == '100x50'
                             ? SizedBox(width: 440, height: 230, child: _buildLargeStickerCard(_activeLabelData!))
-                            : SizedBox(width: 360, height: 140, child: _buildSmallStickerCard(_activeLabelData!)),
+                            : SizedBox(
+                                width: 360,
+                                height: showKeepUpExtras(_activeLabelData!['model'] ?? '')
+                                    ? U350LabelPreview.heightPx
+                                    : 140,
+                                child: _buildSmallStickerCard(_activeLabelData!),
+                              ),
                       ),
                     ),
                   ],
