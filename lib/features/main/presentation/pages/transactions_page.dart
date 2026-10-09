@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:svenska/core/services/local_label_service.dart';
 import 'package:svenska/core/utils/print_timestamp_formatter.dart';
+import 'package:svenska/core/widgets/excel_style_table.dart';
 import 'package:svenska/injection.dart';
 
 class TransactionsPage extends StatefulWidget {
@@ -84,8 +85,7 @@ class _TransactionsPageState extends State<TransactionsPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Transactions', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-            const SizedBox(height: 12),
+            const SizedBox(height: 4),
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -136,28 +136,22 @@ class _TransactionsPageState extends State<TransactionsPage> {
             const SizedBox(height: 12),
             Expanded(
               child: Card(
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: SingleChildScrollView(
-                    child: DataTable(
-                      columns: const [
-                        DataColumn(label: Text('Sl no')),
-                        DataColumn(label: Text('Printed at')),
-                        DataColumn(label: Text('Model')),
-                        DataColumn(label: Text('Serial')),
-                        DataColumn(label: Text('Full QR')),
-                      ],
-                      rows: List.generate(_rows.length, (i) {
-                        final row = _rows[i];
-                        return DataRow(cells: [
-                          DataCell(Text('${_rows.length - i}')),
-                          DataCell(Text(PrintTimestampFormatter.displayFromRaw(row['printed_at']?.toString()))),
-                          DataCell(Text(row['vehicle_model']?.toString() ?? '')),
-                          DataCell(Text(row['serial_no']?.toString() ?? '')),
-                          DataCell(Text(row['full_qr_data']?.toString() ?? '')),
-                        ]);
-                      }),
-                    ),
+                clipBehavior: Clip.antiAlias,
+                child: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: ExcelStyleTable(
+                    columns: const ['S.No', 'Printed at', 'Model', 'Serial', 'Full QR'],
+                    columnWidths: const [48, 140, 72, 56, 300],
+                    rows: List.generate(_rows.length, (i) {
+                      final row = _rows[i];
+                      return [
+                        '${_rows.length - i}',
+                        PrintTimestampFormatter.displayFromRaw(row['printed_at']?.toString()),
+                        row['vehicle_model']?.toString() ?? '',
+                        row['serial_no']?.toString() ?? '',
+                        row['full_qr_data']?.toString() ?? '',
+                      ];
+                    }),
                   ),
                 ),
               ),

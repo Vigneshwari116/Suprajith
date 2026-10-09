@@ -6,13 +6,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:intl/intl.dart';
-import 'package:svenska/features/main/presentation/pages/print_history_audit_modal.dart';
 import 'package:svenska/features/main/presentation/pages/vehicle_models.dart';
 import '../../../../core/constants/app_mode.dart';
+import '../../../../core/services/automotive_date_encoder.dart';
 import '../../../../core/services/local_label_service.dart';
+import '../../../../core/services/printer_config_refresh_notifier.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../injection.dart';
-import 'dual_printer_settings_modal.dart';
 import 'frontend_label_engine.dart';
 import 'logo_assets_resolver.dart';
 import 'master_management_modal.dart';
@@ -57,10 +57,7 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
   String? _printer50x25 = 'TSC TTP-244 Plus';
   String? _printer100x50;
 
-  bool get _isHostMachine {
-    if (kIsWeb) return false;
-    return Platform.isWindows;
-  }
+  PrinterConfigRefreshNotifier? _printerConfigNotifier;
 
   @override
   void initState() {
@@ -68,6 +65,10 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
     _loadMasterRecords();
     _loadPrinterConfig();
     _startTodayDateRefreshTimer();
+    if (kUseLocalDataStore) {
+      _printerConfigNotifier = sl<PrinterConfigRefreshNotifier>();
+      _printerConfigNotifier!.addListener(_loadPrinterConfig);
+    }
   }
 
   void _startTodayDateRefreshTimer() {
@@ -90,6 +91,7 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
 
   @override
   void dispose() {
+    _printerConfigNotifier?.removeListener(_loadPrinterConfig);
     _midnightRefreshTimer?.cancel();
     _modelInputCtrl.dispose();
     _fixedQrDisplayCtrl.dispose();
@@ -232,7 +234,7 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
       _fixedQrDisplayCtrl.text = masterFixedQr;
     });
 
-    final printMoment = DateTime.now();
+    final printMoment = AutomotiveDateEncoder.calendarDateForPrint();
     final formattedDate = DateFormat('dd.MM.yyyy').format(printMoment);
     final targetPrinter = _selectedLabelSize == '100x50'
         ? (_printer100x50 ?? 'TSC TTP-244 Plus')
@@ -244,6 +246,7 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
         data = sl<LocalLabelService>().preparePrint(
           modelQuery: matched.vehicleModel,
           labelSize: _selectedLabelSize,
+          printAt: printMoment,
         );
       } else {
         final response = await sl<ApiClient>().post(
@@ -267,6 +270,7 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
         final String fullPayload = data['full_payload']?.toString() ?? '';
 
         final logoImage = await LogoAssetResolver.getLogoImage(matched.companyLogo);
+        final labelMfgDate = data['mfg_date']?.toString() ?? formattedDate;
 
         final Uint8List pdfBytes;
         if (_selectedLabelSize == '100x50') {
@@ -274,7 +278,7 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
             model: matched.vehicleModel,
             custPart: matched.customerPartNo,
             partNo: matched.partNo,
-            mfgDate: formattedDate,
+            mfgDate: labelMfgDate,
             serial: serialStr,
             qrPayload: fullPayload,
             logoImage: logoImage,
@@ -284,7 +288,7 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
             model: matched.vehicleModel,
             customerPartNo: matched.customerPartNo,
             partNo: matched.partNo,
-            mfgDate: formattedDate,
+            mfgDate: labelMfgDate,
             qrPayload: fullPayload,
             logoImage: logoImage,
           );
@@ -303,7 +307,7 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
           'model': matched.vehicleModel,
           'customer_part_no': matched.customerPartNo,
           'part_no': matched.partNo,
-          'date_of_mfg': formattedDate,
+          'date_of_mfg': labelMfgDate,
           'qr_data': fullPayload,
           'sn': serialStr,
           'size': _selectedLabelSize,
@@ -369,25 +373,6 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
       builder: (ctx) => MasterManagementModal(
         onMasterUpdated: () => _loadMasterRecords(),
       ),
-    );
-  }
-
-  void _openPrinterSettingsModal() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => DualPrinterSettingsModal(
-        currentPrinter50: _printer50x25,
-        currentPrinter100: _printer100x50,
-        onPrinterConfigured: () => _loadPrinterConfig(),
-      ),
-    );
-  }
-
-  void _openHistoryModal() {
-    showDialog(
-      context: context,
-      builder: (ctx) => const PrintHistoryAuditModal(),
     );
   }
 
@@ -518,7 +503,9 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
                 ),
                 Text(
                   formattedDate,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: kTextPrimary),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5, color: kTextPrimary),
                 ),
               ],
             ),
@@ -875,23 +862,7 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
             ),
           ],
         ),
-        actions: [
-          IconButton(
-            tooltip: "Print History",
-            onPressed: _openHistoryModal,
-            icon: const Icon(Icons.history_rounded, color: kTextSecondary),
-          ),
-          if (_isHostMachine)
-            IconButton(
-              tooltip: "Dual Printer Settings",
-              onPressed: _openPrinterSettingsModal,
-              icon: Icon(
-                Icons.print_outlined,
-                color: (_printer50x25 != null && _printer100x50 != null) ? kAccent : Colors.orange,
-              ),
-            ),
-          const SizedBox(width: 8),
-        ],
+        actions: const [SizedBox(width: 8)],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
           child: Container(color: kBorder, height: 1),

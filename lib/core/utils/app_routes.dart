@@ -8,7 +8,6 @@ import 'package:svenska/injection.dart';
 import 'package:svenska/features/main/presentation/pages/desktop_view_page.dart';
 import 'package:svenska/features/main/presentation/pages/masters_page.dart';
 import 'package:svenska/features/main/presentation/pages/reports_page.dart';
-import 'package:svenska/features/main/presentation/pages/transactions_page.dart';
 import 'package:svenska/features/main/presentation/pages/trial_expired_page.dart';
 import 'package:svenska/features/main/presentation/pages/workstation_shell.dart';
 import '../../features/splash/presentation/pages/splash_page.dart';
@@ -54,7 +53,7 @@ class AppRouter {
           ),
           GoRoute(
             path: '/workstation/transactions',
-            builder: (context, state) => const TransactionsPage(),
+            redirect: (_, __) => AppRoutes.workstationMain,
           ),
           GoRoute(
             path: '/workstation/reports',

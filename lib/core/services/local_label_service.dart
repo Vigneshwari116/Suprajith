@@ -1,3 +1,4 @@
+import 'package:intl/intl.dart';
 import 'package:svenska/core/database/local_vehicle_database.dart';
 import 'package:svenska/core/services/automotive_date_encoder.dart';
 import 'package:svenska/core/services/print_history_refresh_notifier.dart';
@@ -109,7 +110,9 @@ class LocalLabelService {
       };
     }
 
-    final activeDate = printAt ?? DateTime.now();
+    // QR middle segment and label MFG both use the same print-time calendar date (not master MFG).
+    final activeDate = AutomotiveDateEncoder.calendarDateForPrint(printAt);
+    final mfgDateLabel = DateFormat('dd.MM.yyyy').format(activeDate);
     final dateShiftCode = AutomotiveDateEncoder.encode(activeDate);
 
     int nextSerial;
@@ -140,7 +143,7 @@ class LocalLabelService {
       model: master['vehicle_model']?.toString() ?? '',
       custPart: master['customer_part_no']?.toString() ?? '',
       partNo: master['part_no']?.toString() ?? '',
-      mfgDate: master['date_of_mfg']?.toString() ?? '',
+      mfgDate: mfgDateLabel,
       serial: serialStr,
       qrPayload: fullPayload,
       companyLogo: master['company_logo']?.toString() ?? 'none',
@@ -159,7 +162,7 @@ class LocalLabelService {
       'model': master['vehicle_model'],
       'customer_part_no': master['customer_part_no'] ?? '',
       'part_no': master['part_no'] ?? '',
-      'mfg_date': master['date_of_mfg'] ?? '',
+      'mfg_date': mfgDateLabel,
       'company_logo': master['company_logo'] ?? 'none',
     };
   }

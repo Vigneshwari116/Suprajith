@@ -7,6 +7,8 @@ import 'package:intl/intl.dart';
 import 'package:printing/printing.dart';
 import 'package:svenska/core/services/local_label_service.dart';
 import 'package:svenska/core/services/report_export_service.dart';
+import 'package:svenska/core/utils/print_timestamp_formatter.dart';
+import 'package:svenska/core/widgets/excel_style_table.dart';
 import 'package:svenska/injection.dart';
 
 class ReportsPage extends StatefulWidget {
@@ -92,8 +94,7 @@ class _ReportsPageState extends State<ReportsPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Reports', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-            const SizedBox(height: 12),
+            const SizedBox(height: 4),
             Wrap(
               spacing: 8,
               children: [
@@ -136,19 +137,33 @@ class _ReportsPageState extends State<ReportsPage> {
             const SizedBox(height: 12),
             Expanded(
               child: Card(
-                child: ListView.builder(
-                  itemCount: _rows.length,
-                  itemBuilder: (context, index) {
-                    final row = _rows[index];
-                    return ListTile(
-                      dense: true,
-                      title: Text('${row['vehicle_model']}  #${row['serial_no']}  ${row['full_qr_data']}'),
-                      subtitle: Text(
-                        '${row['customer_part_no']} | ${row['part_no']}',
-                        style: const TextStyle(fontSize: 11),
-                      ),
-                    );
-                  },
+                clipBehavior: Clip.antiAlias,
+                child: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: ExcelStyleTable(
+                    columns: const [
+                      'S.No',
+                      'Printed at',
+                      'Model',
+                      'Serial',
+                      'Customer part',
+                      'Part no',
+                      'Full QR',
+                    ],
+                    columnWidths: const [48, 130, 64, 52, 100, 100, 280],
+                    rows: List.generate(_rows.length, (index) {
+                      final row = _rows[index];
+                      return [
+                        '${index + 1}',
+                        PrintTimestampFormatter.displayFromRaw(row['printed_at']?.toString()),
+                        row['vehicle_model']?.toString() ?? '',
+                        row['serial_no']?.toString() ?? '',
+                        row['customer_part_no']?.toString() ?? '',
+                        row['part_no']?.toString() ?? '',
+                        row['full_qr_data']?.toString() ?? '',
+                      ];
+                    }),
+                  ),
                 ),
               ),
             ),
