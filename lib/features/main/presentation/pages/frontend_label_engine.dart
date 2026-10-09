@@ -31,11 +31,7 @@ class FrontendLabelEngine {
     final doc = pw.Document();
     doc.addPage(
       pw.Page(
-        pageFormat: const PdfPageFormat(
-          5.0 * PdfPageFormat.cm,
-          2.5 * PdfPageFormat.cm,
-          marginAll: 0.1 * PdfPageFormat.cm,
-        ),
+        pageFormat: kLabel50x25PageFormat,
         build: (pw.Context context) {
           return pw.Container(
             decoration: const pw.BoxDecoration(
@@ -121,11 +117,7 @@ class FrontendLabelEngine {
     final doc = pw.Document();
     doc.addPage(
       pw.Page(
-        pageFormat: PdfPageFormat(
-          U350LabelLayout.mmToPdfPoints(U350LabelLayout.pageWidthMm),
-          U350LabelLayout.mmToPdfPoints(U350LabelLayout.pageHeightMm),
-          marginAll: 0,
-        ),
+        pageFormat: U350LabelLayout.pageFormat,
         build: (pw.Context context) {
           return pw.SizedBox(
             width: U350LabelLayout.mmToPdfPoints(U350LabelLayout.pageWidthMm),
@@ -279,13 +271,15 @@ class FrontendLabelEngine {
     return pw.CustomPaint(
       size: PdfPoint(wPt, hPt),
       painter: (PdfGraphics canvas, PdfPoint size) {
+        // PdfGraphics uses a bottom-left origin (y grows upward), unlike Flutter preview.
         canvas.setFillColor(PdfColors.black);
-        canvas.moveTo(size.x / 2, 0);
-        canvas.lineTo(size.x, headPt);
-        canvas.lineTo(0, headPt);
+        final headBaseY = size.y - headPt;
+        canvas.moveTo(size.x / 2, size.y);
+        canvas.lineTo(size.x, headBaseY);
+        canvas.lineTo(0, headBaseY);
         canvas.closePath();
         canvas.fillPath();
-        canvas.drawRect(shaftLeftPt, headPt, shaftWPt, size.y - headPt);
+        canvas.drawRect(shaftLeftPt, 0, shaftWPt, headBaseY);
       },
     );
   }
@@ -410,6 +404,7 @@ class FrontendLabelEngine {
     required Uint8List pdfBytes,
     required String printerName,
     required String jobName,
+    PdfPageFormat pageFormat = kLabel50x25PageFormat,
   }) async {
     final printers = await Printing.listPrinters();
     Printer? target;
@@ -426,6 +421,9 @@ class FrontendLabelEngine {
         printer: target,
         onLayout: (PdfPageFormat format) async => pdfBytes,
         name: jobName,
+        format: pageFormat,
+        dynamicLayout: false,
+        usePrinterSettings: true,
       );
       if (!success) {
         throw Exception('Direct print was rejected by driver for "$printerName".');
@@ -434,6 +432,9 @@ class FrontendLabelEngine {
       await Printing.layoutPdf(
         onLayout: (PdfPageFormat format) async => pdfBytes,
         name: jobName,
+        format: pageFormat,
+        dynamicLayout: false,
+        usePrinterSettings: true,
       );
     }
   }

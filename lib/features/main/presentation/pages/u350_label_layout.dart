@@ -6,6 +6,12 @@ class U350LabelLayout {
   static const double pageWidthMm = 50;
   static const double pageHeightMm = 25;
 
+  static PdfPageFormat get pageFormat => PdfPageFormat(
+        mmToPdfPoints(pageWidthMm),
+        mmToPdfPoints(pageHeightMm),
+        marginAll: 0,
+      );
+
   static const double logoLeftMm = 1.5;
   static const double logoTopMm = 1.0;
   static const double logoWidthMm = 11;
