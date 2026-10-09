@@ -4,6 +4,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:svenska/features/main/presentation/pages/vehicle_models.dart';
+import '../../../../core/constants/label_config.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../injection.dart';
 import 'frontend_label_engine.dart';
@@ -182,6 +183,7 @@ class _PrintHistoryAuditModalState extends State<PrintHistoryAuditModal> {
         pdfBytes: pdfBytes,
         printerName: 'TSC TTP-244 Plus',
         jobName: 'Reprint_${item.vehicleModel}_${item.serialNo}',
+        pageFormat: chosenSize == '100x50' ? kLabel100x50PageFormat : kLabel50x25PageFormat,
       );
 
       if (mounted) {

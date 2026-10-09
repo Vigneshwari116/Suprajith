@@ -308,6 +308,9 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
           pdfBytes: pdfBytes,
           printerName: targetPrinter,
           jobName: 'Label_${matched.vehicleModel}_$serialStr',
+          pageFormat: _selectedLabelSize == '100x50'
+              ? kLabel100x50PageFormat
+              : kLabel50x25PageFormat,
         );
 
         final labelMap = {
