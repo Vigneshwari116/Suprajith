@@ -15,8 +15,6 @@ class WorkstationShell extends StatefulWidget {
 }
 
 class _WorkstationShellState extends State<WorkstationShell> {
-  bool _menuExpanded = false;
-
   int _selectedIndex(String location) {
     if (location.startsWith(AppRoutes.workstationMasters)) return 1;
     if (location.startsWith(AppRoutes.workstationTransactions)) return 2;
@@ -42,7 +40,6 @@ class _WorkstationShellState extends State<WorkstationShell> {
 
   void _navigate(BuildContext context, String route) {
     context.go(route);
-    setState(() => _menuExpanded = false);
   }
 
   Future<void> _confirmLogout(BuildContext context) async {
@@ -61,7 +58,6 @@ class _WorkstationShellState extends State<WorkstationShell> {
     if (kUseLocalDataStore) {
       sl<AuthService>().logout();
     }
-    setState(() => _menuExpanded = false);
     context.go(AppRoutes.login);
   }
 
@@ -72,125 +68,176 @@ class _WorkstationShellState extends State<WorkstationShell> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
-      body: Column(
+      body: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Material(
             color: Colors.white,
-            elevation: 0,
-            child: Container(
-              decoration: const BoxDecoration(
-                border: Border(bottom: BorderSide(color: Color(0xFFCBD5E1))),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            elevation: 1,
+            child: SizedBox(
+              width: 200,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.qr_code_2_rounded, color: Color(0xFF0F172A), size: 22),
-                      const SizedBox(width: 8),
-                      const Expanded(
-                        child: Text(
-                          'SVENSKA AUTOMOTIVE',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.indigoAccent),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      if (!_menuExpanded) ...[
-                        Text(
-                          _pageTitle(selected),
-                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
-                        ),
-                        const SizedBox(width: 8),
-                      ],
-                      TextButton.icon(
-                        onPressed: () => setState(() => _menuExpanded = !_menuExpanded),
-                        icon: Icon(_menuExpanded ? Icons.expand_less : Icons.menu, size: 18),
-                        label: Text(
-                          _menuExpanded ? 'Close menu' : 'Menu',
-                          style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
-                        ),
-                        style: TextButton.styleFrom(
-                          foregroundColor: const Color(0xFF2563EB),
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (_menuExpanded) ...[
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(14, 16, 14, 12),
+                    child: Row(
                       children: [
-                        _NavTab(
+                        Icon(Icons.qr_code_2_rounded, color: Color(0xFF0F172A), size: 22),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'SVENSKA AUTOMOTIVE',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 11,
+                              color: Colors.indigoAccent,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1, color: Color(0xFFCBD5E1)),
+                  Expanded(
+                    child: ListView(
+                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                      children: [
+                        _SideNavItem(
                           label: 'Main screen',
+                          icon: Icons.home_outlined,
                           selected: selected == 0,
                           onTap: () => _navigate(context, AppRoutes.workstationMain),
                         ),
-                        _NavTab(
+                        _SideNavItem(
                           label: 'Masters',
+                          icon: Icons.storage_outlined,
                           selected: selected == 1,
                           onTap: () => _navigate(context, AppRoutes.workstationMasters),
                         ),
-                        _NavTab(
+                        _SideNavItem(
                           label: 'Transactions',
+                          icon: Icons.receipt_long_outlined,
                           selected: selected == 2,
                           onTap: () => _navigate(context, AppRoutes.workstationTransactions),
                         ),
-                        _NavTab(
+                        _SideNavItem(
                           label: 'Reports',
+                          icon: Icons.assessment_outlined,
                           selected: selected == 3,
                           onTap: () => _navigate(context, AppRoutes.workstationReports),
                         ),
-                        _NavTab(
+                        _SideNavItem(
                           label: 'Backup',
+                          icon: Icons.backup_outlined,
                           selected: selected == 4,
                           onTap: () => _navigate(context, AppRoutes.workstationBackup),
                         ),
-                        if (kUseLocalDataStore)
-                          _NavTab(
-                            label: 'Logout',
-                            selected: false,
-                            onTap: () => _confirmLogout(context),
-                          ),
                       ],
+                    ),
+                  ),
+                  if (kUseLocalDataStore) ...[
+                    const Divider(height: 1, color: Color(0xFFCBD5E1)),
+                    Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: _SideNavItem(
+                        label: 'Logout',
+                        icon: Icons.logout,
+                        selected: false,
+                        onTap: () => _confirmLogout(context),
+                      ),
                     ),
                   ],
                 ],
               ),
             ),
           ),
-          Expanded(child: widget.child),
+          const VerticalDivider(width: 1, color: Color(0xFFCBD5E1)),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Material(
+                  color: Colors.white,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: const BoxDecoration(
+                      border: Border(bottom: BorderSide(color: Color(0xFFCBD5E1))),
+                    ),
+                    child: Text(
+                      _pageTitle(selected),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                  ),
+                ),
+                Expanded(child: widget.child),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-class _NavTab extends StatelessWidget {
+class _SideNavItem extends StatelessWidget {
   final String label;
+  final IconData icon;
   final bool selected;
   final VoidCallback onTap;
 
-  const _NavTab({
+  const _SideNavItem({
     required this.label,
+    required this.icon,
     required this.selected,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return TextButton(
-      style: TextButton.styleFrom(
-        foregroundColor: selected ? const Color(0xFF2563EB) : const Color(0xFF475569),
-        backgroundColor: selected ? const Color(0xFFEFF6FF) : const Color(0xFFF8FAFC),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        side: BorderSide(color: selected ? const Color(0xFF2563EB) : const Color(0xFFCBD5E1)),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Material(
+        color: selected ? const Color(0xFFEFF6FF) : Colors.transparent,
+        borderRadius: BorderRadius.circular(6),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(6),
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(
+                color: selected ? const Color(0xFF2563EB) : Colors.transparent,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  icon,
+                  size: 18,
+                  color: selected ? const Color(0xFF2563EB) : const Color(0xFF475569),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: selected ? FontWeight.bold : FontWeight.w600,
+                      color: selected ? const Color(0xFF2563EB) : const Color(0xFF475569),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
-      onPressed: onTap,
-      child: Text(label, style: TextStyle(fontWeight: selected ? FontWeight.bold : FontWeight.w600, fontSize: 11.5)),
     );
   }
 }
