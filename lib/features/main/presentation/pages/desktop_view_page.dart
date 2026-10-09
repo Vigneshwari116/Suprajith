@@ -7,8 +7,9 @@ import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:svenska/features/main/presentation/pages/print_history_audit_modal.dart';
-import 'package:svenska/features/main/presentation/pages/server_admin_dialog.dart';
 import 'package:svenska/features/main/presentation/pages/vehicle_models.dart';
+import '../../../../core/constants/app_mode.dart';
+import '../../../../core/services/local_label_service.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../injection.dart';
 import 'dual_printer_settings_modal.dart';
@@ -55,9 +56,6 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
   String? _printer50x25 = 'TSC TTP-244 Plus';
   String? _printer100x50;
 
-  bool _isServerOnline = false;
-  Timer? _healthCheckTimer;
-
   bool get _isHostMachine {
     if (kIsWeb) return false;
     return Platform.isWindows;
@@ -67,8 +65,7 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
   void initState() {
     super.initState();
     _loadMasterRecords();
-    _fetchServerPrinterConfig();
-    _startLiveHealthPolling();
+    _loadPrinterConfig();
     _startTodayDateRefreshTimer();
   }
 
@@ -92,7 +89,6 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
 
   @override
   void dispose() {
-    _healthCheckTimer?.cancel();
     _midnightRefreshTimer?.cancel();
     _modelInputCtrl.dispose();
     _fixedQrDisplayCtrl.dispose();
@@ -100,59 +96,40 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
     super.dispose();
   }
 
-  void _startLiveHealthPolling() {
-    _checkServerPing();
-    _healthCheckTimer = Timer.periodic(const Duration(seconds: 3), (_) {
-      _checkServerPing();
-    });
-  }
-
-  Future<void> _checkServerPing() async {
-    try {
-      final res = await sl<ApiClient>().get('/api/ping');
-      final isOnline = res.statusCode == 200 && res.data['status'] == 'online';
-      if (mounted && _isServerOnline != isOnline) {
-        setState(() {
-          _isServerOnline = isOnline;
-        });
-        if (isOnline) {
-          _loadMasterRecords();
-          _fetchServerPrinterConfig();
-        }
-      }
-    } catch (_) {
-      if (mounted && _isServerOnline) {
-        setState(() {
-          _isServerOnline = false;
-        });
-      }
-    }
-  }
-
   Future<void> _loadMasterRecords() async {
     try {
-      final res = await sl<ApiClient>().get('/api/masters');
-      if (res.statusCode == 200 && res.data['status'] == 'success') {
-        final List raw = res.data['data'] ?? [];
-        if (mounted) {
-          final list = raw.map((e) => VehicleMaster.fromMap(e)).toList();
+      final List raw = kUseLocalDataStore
+          ? sl<LocalLabelService>().listMasters()
+          : (await sl<ApiClient>().get('/api/masters')).data['data'] as List? ?? [];
+      if (mounted) {
+        final list = raw.map((e) => VehicleMaster.fromMap(e as Map<String, dynamic>)).toList();
 
-          // Deduplicate by vehicleModel to guarantee no duplicate dropdown assertion crashes
-          final uniqueMap = <String, VehicleMaster>{};
-          for (var item in list) {
-            uniqueMap[item.vehicleModel.trim().toLowerCase()] = item;
-          }
-
-          setState(() {
-            _masterList = uniqueMap.values.toList();
-          });
+        final uniqueMap = <String, VehicleMaster>{};
+        for (var item in list) {
+          uniqueMap[item.vehicleModel.trim().toLowerCase()] = item;
         }
+
+        setState(() {
+          _masterList = uniqueMap.values.toList();
+        });
       }
     } catch (_) {}
   }
 
-  Future<void> _fetchServerPrinterConfig() async {
+  Future<void> _loadPrinterConfig() async {
     try {
+      if (kUseLocalDataStore) {
+        final data = sl<LocalLabelService>().getPrinterConfig();
+        if (mounted) {
+          setState(() {
+            _printer50x25 = data['printer_50x25']?.toString().isNotEmpty == true
+                ? data['printer_50x25']?.toString()
+                : 'TSC TTP-244 Plus';
+            _printer100x50 = data['printer_100x50']?.toString();
+          });
+        }
+        return;
+      }
       final res = await sl<ApiClient>().get('/api/printer');
       if (res.statusCode == 200 && mounted) {
         setState(() {
@@ -212,11 +189,6 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
   }
 
   Future<void> _handleEnterAndPrint() async {
-    if (!_isServerOnline) {
-      _showToast("Cannot print: Server is currently OFFLINE / Unreachable.", isError: true);
-      return;
-    }
-
     final query = _modelInputCtrl.text.trim();
     if (query.isEmpty) {
       setState(() => _validationError = "Please scan or enter a Vehicle Model!");
@@ -266,17 +238,30 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
         : (_printer50x25 ?? 'TSC TTP-244 Plus');
 
     try {
-      final response = await sl<ApiClient>().post(
-        '/api/print',
-        data: {
-          'model': matched.vehicleModel,
-          'date': formattedDate,
-          'label_size': _selectedLabelSize,
-        },
-      );
+      final Map<String, dynamic> data;
+      if (kUseLocalDataStore) {
+        data = sl<LocalLabelService>().preparePrint(
+          modelQuery: matched.vehicleModel,
+          labelSize: _selectedLabelSize,
+        );
+      } else {
+        final response = await sl<ApiClient>().post(
+          '/api/print',
+          data: {
+            'model': matched.vehicleModel,
+            'date': formattedDate,
+            'label_size': _selectedLabelSize,
+          },
+        );
+        data = Map<String, dynamic>.from(response.data as Map);
+        if (response.statusCode != 200 || data['status'] != 'success') {
+          final err = data['message'] ?? 'Server could not prepare serial payload.';
+          _showToast("PRINT FAILED: $err", isError: true);
+          return;
+        }
+      }
 
-      final data = response.data;
-      if (response.statusCode == 200 && data['status'] == 'success') {
+      if (data['status'] == 'success') {
         final String serialStr = data['serial']?.toString() ?? '0001';
         final String fullPayload = data['full_payload']?.toString() ?? '';
 
@@ -393,7 +378,7 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
       builder: (ctx) => DualPrinterSettingsModal(
         currentPrinter50: _printer50x25,
         currentPrinter100: _printer100x50,
-        onPrinterConfigured: () => _fetchServerPrinterConfig(),
+        onPrinterConfigured: () => _loadPrinterConfig(),
       ),
     );
   }
@@ -402,59 +387,6 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
     showDialog(
       context: context,
       builder: (ctx) => const PrintHistoryAuditModal(),
-    );
-  }
-
-  Widget _buildLiveServerBadge() {
-    return InkWell(
-      onTap: _isHostMachine
-          ? () async {
-        await showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (_) => ServerAdminDialog(
-            isCurrentlyRunning: _isServerOnline,
-            onStateChanged: _checkServerPing,
-          ),
-        );
-        _checkServerPing();
-      }
-          : () => _checkServerPing(),
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(
-          color: _isServerOnline ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
-          border: Border.all(color: _isServerOnline ? Colors.green : Colors.red, width: 1.2),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 8,
-              height: 8,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: _isServerOnline ? Colors.green : Colors.red,
-              ),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              _isServerOnline ? "ONLINE" : "OFFLINE",
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                color: _isServerOnline ? Colors.green.shade800 : Colors.red.shade800,
-              ),
-            ),
-            if (_isHostMachine) ...[
-              const SizedBox(width: 4),
-              Icon(Icons.settings, size: 12, color: _isServerOnline ? Colors.green.shade800 : Colors.red.shade800),
-            ],
-          ],
-        ),
-      ),
     );
   }
 
@@ -598,7 +530,7 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
   Widget _buildPrintButton() {
     return ElevatedButton.icon(
       style: ElevatedButton.styleFrom(
-        backgroundColor: _isServerOnline ? kAccent : Colors.grey,
+        backgroundColor: kAccent,
         foregroundColor: Colors.white,
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
@@ -943,8 +875,6 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
           ],
         ),
         actions: [
-          _buildLiveServerBadge(),
-          const SizedBox(width: 8),
           IconButton(
             tooltip: "Print History",
             onPressed: _openHistoryModal,
