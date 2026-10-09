@@ -275,7 +275,7 @@ class _MasterManagementModalState extends State<MasterManagementModal> {
                   const Text("VEHICLE MASTER ENTRY",
                       style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black)),
                   const Spacer(),
-                  if (kUseLocalDataStore)
+                  if (kUseLocalDataStore && kEnableImportOldServerDb)
                     TextButton.icon(
                       onPressed: _isLoading ? null : _importFromLegacyServerDatabase,
                       icon: const Icon(Icons.upload_file, size: 16),
