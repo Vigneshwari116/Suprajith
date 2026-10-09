@@ -110,7 +110,8 @@ class LocalLabelService {
       };
     }
 
-    final activeDate = printAt ?? DateTime.now();
+    // QR middle segment and label MFG both use the same print-time calendar date (not master MFG).
+    final activeDate = AutomotiveDateEncoder.calendarDateForPrint(printAt);
     final mfgDateLabel = DateFormat('dd.MM.yyyy').format(activeDate);
     final dateShiftCode = AutomotiveDateEncoder.encode(activeDate);
 

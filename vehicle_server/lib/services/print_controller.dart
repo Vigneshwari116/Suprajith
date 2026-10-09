@@ -82,8 +82,9 @@ class PrintController {
         }, statusCode: 400);
       }
 
-      // Always use system date at print time for QR date encoding and label MFG.
-      final activeDate = DateTime.now();
+      // QR date segment and label MFG use today's calendar date at print time (ignore master MFG).
+      final now = DateTime.now();
+      final activeDate = DateTime(now.year, now.month, now.day);
       final mfgDateLabel =
           '${activeDate.day.toString().padLeft(2, '0')}.${activeDate.month.toString().padLeft(2, '0')}.${activeDate.year}';
 

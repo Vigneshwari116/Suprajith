@@ -1,5 +1,11 @@
 /// Automotive QR date encoding (day letter + month letter + 2-digit year + shift).
 class AutomotiveDateEncoder {
+  /// Calendar date used for QR encoding and label MFG (local year/month/day only).
+  static DateTime calendarDateForPrint([DateTime? moment]) {
+    final m = moment ?? DateTime.now();
+    return DateTime(m.year, m.month, m.day);
+  }
+
   static const Map<int, String> _dateMap = {
     1: '1', 2: '2', 3: '3', 4: '4', 5: '5', 6: '6', 7: '7', 8: '8', 9: '9',
     10: 'A', 11: 'B', 12: 'C', 13: 'D', 14: 'E', 15: 'F', 16: 'G', 17: 'H',

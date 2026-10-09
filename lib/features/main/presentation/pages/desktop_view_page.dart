@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 import 'package:svenska/features/main/presentation/pages/print_history_audit_modal.dart';
 import 'package:svenska/features/main/presentation/pages/vehicle_models.dart';
 import '../../../../core/constants/app_mode.dart';
+import '../../../../core/services/automotive_date_encoder.dart';
 import '../../../../core/services/local_label_service.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../injection.dart';
@@ -232,7 +233,7 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
       _fixedQrDisplayCtrl.text = masterFixedQr;
     });
 
-    final printMoment = DateTime.now();
+    final printMoment = AutomotiveDateEncoder.calendarDateForPrint();
     final formattedDate = DateFormat('dd.MM.yyyy').format(printMoment);
     final targetPrinter = _selectedLabelSize == '100x50'
         ? (_printer100x50 ?? 'TSC TTP-244 Plus')

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:svenska/core/database/local_vehicle_database.dart';
+import 'package:svenska/core/services/automotive_date_encoder.dart';
 import 'package:svenska/core/services/local_label_service.dart';
 import 'package:svenska/core/services/print_history_refresh_notifier.dart';
 
@@ -69,6 +70,10 @@ void main() {
     );
     expect(res['status'], 'success');
     expect(res['mfg_date'], '15.03.2026');
+    final payload = res['full_payload']?.toString() ?? '';
+    final dateCode = AutomotiveDateEncoder.encode(DateTime(2026, 3, 15));
+    expect(payload.length, 29);
+    expect(payload.substring(19, 19 + dateCode.length), dateCode);
   });
 
   test('fixed QR must be 19 chars and daily limit message', () {
