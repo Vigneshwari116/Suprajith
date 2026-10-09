@@ -242,15 +242,7 @@ class FrontendLabelEngine {
                   ),
                   ),
                 ),
-                pw.Positioned(
-                  left: U350LabelLayout.mmToPdfPoints(U350LabelLayout.arrowLeftMm),
-                  top: U350LabelLayout.mmToPdfPoints(U350LabelLayout.arrowTopMm),
-                  child: pw.SizedBox(
-                    width: U350LabelLayout.mmToPdfPoints(U350LabelLayout.arrowWidthMm),
-                    height: U350LabelLayout.mmToPdfPoints(U350LabelLayout.arrowHeightMm),
-                    child: _buildU350UpArrowPdf(),
-                  ),
-                ),
+                ..._buildU350UpArrowPdfWidgets(),
               ],
             ),
           );
@@ -260,28 +252,45 @@ class FrontendLabelEngine {
     return await doc.save();
   }
 
-  static pw.Widget _buildU350UpArrowPdf() {
-    final wPt = U350LabelLayout.mmToPdfPoints(U350LabelLayout.arrowWidthMm);
-    final hPt = U350LabelLayout.mmToPdfPoints(U350LabelLayout.arrowHeightMm);
-    final headPt = U350LabelLayout.mmToPdfPoints(U350LabelLayout.arrowHeadHeightMm);
-    final shaftWPt = U350LabelLayout.mmToPdfPoints(U350LabelLayout.arrowShaftWidthMm);
-    final shaftLeftPt =
-        U350LabelLayout.mmToPdfPoints(U350LabelLayout.arrowShaftLeftMm - U350LabelLayout.arrowLeftMm);
+  /// Arrow as [pw.Positioned] widgets: shaft = filled rect (reliable on all drivers),
+  /// head = small [pw.CustomPaint] triangle (PdfGraphics y-up within the head box).
+  static List<pw.Widget> _buildU350UpArrowPdfWidgets() {
+    final mm = U350LabelLayout.mmToPdfPoints;
+    final headHm = U350LabelLayout.arrowHeadHeightMm;
+    final shaftHm = U350LabelLayout.arrowHeightMm - headHm;
+    final headW = mm(U350LabelLayout.arrowWidthMm);
+    final headH = mm(headHm);
 
-    return pw.CustomPaint(
-      size: PdfPoint(wPt, hPt),
-      painter: (PdfGraphics canvas, PdfPoint size) {
-        // PdfGraphics uses a bottom-left origin (y grows upward), unlike Flutter preview.
-        canvas.setFillColor(PdfColors.black);
-        final headBaseY = size.y - headPt;
-        canvas.moveTo(size.x / 2, size.y);
-        canvas.lineTo(size.x, headBaseY);
-        canvas.lineTo(0, headBaseY);
-        canvas.closePath();
-        canvas.fillPath();
-        canvas.drawRect(shaftLeftPt, 0, shaftWPt, headBaseY);
-      },
-    );
+    return [
+      pw.Positioned(
+        left: mm(U350LabelLayout.arrowShaftLeftMm),
+        top: mm(U350LabelLayout.arrowTopMm + headHm),
+        child: pw.Container(
+          width: mm(U350LabelLayout.arrowShaftWidthMm),
+          height: mm(shaftHm),
+          color: PdfColors.black,
+        ),
+      ),
+      pw.Positioned(
+        left: mm(U350LabelLayout.arrowLeftMm),
+        top: mm(U350LabelLayout.arrowTopMm),
+        child: pw.SizedBox(
+          width: headW,
+          height: headH,
+          child: pw.CustomPaint(
+            size: PdfPoint(headW, headH),
+            painter: (PdfGraphics canvas, PdfPoint size) {
+              canvas.setFillColor(PdfColors.black);
+              canvas.moveTo(size.x / 2, size.y);
+              canvas.lineTo(size.x, 0);
+              canvas.lineTo(0, 0);
+              canvas.closePath();
+              canvas.fillPath();
+            },
+          ),
+        ),
+      ),
+    ];
   }
 
   /// 100x50 mm Industrial Layout
