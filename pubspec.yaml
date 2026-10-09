@@ -60,6 +60,7 @@ dependencies:
   sqlite3: ^2.9.4
   sqlite3_flutter_libs: ^0.5.28
   path: ^1.9.1
+  crypto: ^3.0.7
 
 
 dev_dependencies:

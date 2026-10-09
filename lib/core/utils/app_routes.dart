@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:svenska/core/constants/app_mode.dart';
+import 'package:svenska/core/services/auth_service.dart';
+import 'package:svenska/features/auth/presentation/login_page.dart';
 import 'package:svenska/features/main/presentation/pages/backup_page.dart';
+import 'package:svenska/injection.dart';
 import 'package:svenska/features/main/presentation/pages/desktop_view_page.dart';
 import 'package:svenska/features/main/presentation/pages/masters_page.dart';
 import 'package:svenska/features/main/presentation/pages/reports_page.dart';
@@ -21,7 +25,23 @@ class AppRouter {
         path: AppRoutes.splash,
         builder: (context, state) => const SplashPage(),
       ),
+      GoRoute(
+        path: AppRoutes.login,
+        redirect: (context, state) {
+          if (!kUseLocalDataStore) return AppRoutes.workstationMain;
+          AuthService.ensureDefaultCredentials();
+          if (sl<AuthService>().isLoggedIn()) return AppRoutes.workstationMain;
+          return null;
+        },
+        builder: (context, state) => const LoginPage(),
+      ),
       ShellRoute(
+        redirect: (context, state) {
+          if (!kUseLocalDataStore) return null;
+          AuthService.ensureDefaultCredentials();
+          if (!sl<AuthService>().isLoggedIn()) return AppRoutes.login;
+          return null;
+        },
         builder: (context, state, child) => WorkstationShell(child: child),
         routes: [
           GoRoute(

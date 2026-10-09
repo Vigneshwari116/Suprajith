@@ -348,6 +348,12 @@ class LocalVehicleDatabase {
     stmt.dispose();
   }
 
+  static void deleteConfig(String key) {
+    final stmt = db.prepare('DELETE FROM app_config WHERE key = ?');
+    stmt.execute([key]);
+    stmt.dispose();
+  }
+
   /// Copies [vehicle_master] rows from another SQLite file; skips existing models.
   static ({int imported, int skipped}) importMastersFromDatabaseFile(String filePath) {
     final external = sqlite3.open(filePath);
