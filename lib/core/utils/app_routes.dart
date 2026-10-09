@@ -1,38 +1,62 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:svenska/features/main/presentation/pages/backup_page.dart';
 import 'package:svenska/features/main/presentation/pages/desktop_view_page.dart';
-import '../../core/utils/routes_name.dart';
-import '../../features/main/presentation/pages/trial_expired_page.dart';
+import 'package:svenska/features/main/presentation/pages/masters_page.dart';
+import 'package:svenska/features/main/presentation/pages/reports_page.dart';
+import 'package:svenska/features/main/presentation/pages/transactions_page.dart';
+import 'package:svenska/features/main/presentation/pages/trial_expired_page.dart';
+import 'package:svenska/features/main/presentation/pages/workstation_shell.dart';
 import '../../features/splash/presentation/pages/splash_page.dart';
+import 'routes_name.dart';
 
 class AppRouter {
   static final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
-  static final GlobalKey<NavigatorState> _shellNavigatorKey = GlobalKey<NavigatorState>();
 
   static final GoRouter router = GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: AppRoutes.splash,
-
     routes: [
       GoRoute(
         path: AppRoutes.splash,
         builder: (context, state) => const SplashPage(),
       ),
-
+      ShellRoute(
+        builder: (context, state, child) => WorkstationShell(child: child),
+        routes: [
+          GoRoute(
+            path: '/workstation/main',
+            builder: (context, state) => const VehicleQRWorkstationPage(),
+          ),
+          GoRoute(
+            path: '/workstation/masters',
+            builder: (context, state) => const MastersPage(),
+          ),
+          GoRoute(
+            path: '/workstation/transactions',
+            builder: (context, state) => const TransactionsPage(),
+          ),
+          GoRoute(
+            path: '/workstation/reports',
+            builder: (context, state) => const ReportsPage(),
+          ),
+          GoRoute(
+            path: '/workstation/backup',
+            builder: (context, state) => const BackupPage(),
+          ),
+        ],
+      ),
       GoRoute(
         path: AppRoutes.desktopViewPage,
-        builder: (context, state) => const VehicleQRWorkstationPage(),
+        redirect: (_, __) => AppRoutes.workstationMain,
       ),
       GoRoute(
         path: AppRoutes.trialExpiredPage,
         builder: (context, state) => const TrialExpiredPage(),
       ),
-
-
     ],
-
     errorBuilder: (context, state) => Scaffold(
-      body: Center(child: Text("Page not found: ${state.error}")),
+      body: Center(child: Text('Page not found: ${state.error}')),
     ),
   );
 }

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
+import '../../../../core/constants/app_mode.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/services/local_label_service.dart';
 import '../../../../injection.dart';
 
 class DualPrinterSettingsModal extends StatefulWidget {
@@ -51,17 +53,26 @@ class _DualPrinterSettingsModalState extends State<DualPrinterSettingsModal> {
   Future<void> _saveSelection() async {
     setState(() => _isSaving = true);
     try {
-      final res = await sl<ApiClient>().post(
-        '/api/printer',
-        data: {
-          'printer_50x25': _selected50 ?? '',
-          'printer_100x50': _selected100 ?? '',
-        },
-      );
-
-      if (res.statusCode == 200) {
+      if (kUseLocalDataStore) {
+        sl<LocalLabelService>().setPrinterConfig(
+          printer50x25: _selected50 ?? '',
+          printer100x50: _selected100 ?? '',
+        );
         widget.onPrinterConfigured();
         if (mounted) Navigator.pop(context);
+      } else {
+        final res = await sl<ApiClient>().post(
+          '/api/printer',
+          data: {
+            'printer_50x25': _selected50 ?? '',
+            'printer_100x50': _selected100 ?? '',
+          },
+        );
+
+        if (res.statusCode == 200) {
+          widget.onPrinterConfigured();
+          if (mounted) Navigator.pop(context);
+        }
       }
     } catch (_) {} finally {
       if (mounted) setState(() => _isSaving = false);

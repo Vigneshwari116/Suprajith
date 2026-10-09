@@ -4,8 +4,10 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:svenska/features/main/presentation/pages/vehicle_models.dart';
+import '../../../../core/constants/app_mode.dart';
 import '../../../../core/constants/label_config.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/services/local_label_service.dart';
 import '../../../../injection.dart';
 import 'frontend_label_engine.dart';
 import 'logo_assets_resolver.dart';
@@ -37,12 +39,11 @@ class _PrintHistoryAuditModalState extends State<PrintHistoryAuditModal> {
   Future<void> _loadGroupedHistory() async {
     setState(() => _isLoading = true);
     try {
-      final res = await sl<ApiClient>().get('/api/history');
-      if (res.statusCode == 200 && res.data['status'] == 'success') {
-        final List raw = res.data['data'] ?? [];
-        _rawHistoryList = raw.map((e) => PrintHistoryRecord.fromMap(e)).toList();
-        _applyDateFilters();
-      }
+      final List raw = kUseLocalDataStore
+          ? sl<LocalLabelService>().getPrintHistory()
+          : (await sl<ApiClient>().get('/api/history')).data['data'] as List? ?? [];
+      _rawHistoryList = raw.map((e) => PrintHistoryRecord.fromMap(e as Map<String, dynamic>)).toList();
+      _applyDateFilters();
     } catch (_) {
       if (mounted) setState(() => _isLoading = false);
     }
