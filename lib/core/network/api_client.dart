@@ -4,7 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import '../utils/constant/endpoints.dart';
+import '../utils/constant/Endpoints.dart';
 
 class ApiClient {
   final Dio _dio;

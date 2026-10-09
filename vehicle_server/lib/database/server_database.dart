@@ -34,6 +34,12 @@ class ServerDatabase {
       db.execute("ALTER TABLE vehicle_master ADD COLUMN company_logo TEXT DEFAULT 'none';");
     } catch (_) {}
 
+    try {
+      db.execute(
+        'ALTER TABLE vehicle_master ADD COLUMN show_keep_up_arrow INTEGER NOT NULL DEFAULT 0;',
+      );
+    } catch (_) {}
+
     db.execute('''
       CREATE TABLE IF NOT EXISTS serial_tracker (
         vehicle_model TEXT PRIMARY KEY,
@@ -41,6 +47,8 @@ class ServerDatabase {
         last_date TEXT NOT NULL DEFAULT ''
       );
     ''');
+
+    _migrateSerialTrackerToPerDateCode();
 
     db.execute('''
       CREATE TABLE IF NOT EXISTS print_history (
@@ -71,6 +79,32 @@ class ServerDatabase {
     print('[DB] Initialized at: $dbPath');
   }
 
+  static void _migrateSerialTrackerToPerDateCode() {
+    final cols = db.select('PRAGMA table_info(serial_tracker)');
+    final hasDateCode = cols.any((c) => c['name']?.toString() == 'date_code');
+    if (hasDateCode) return;
+
+    db.execute('''
+      CREATE TABLE serial_tracker_v2 (
+        vehicle_model TEXT NOT NULL,
+        date_code TEXT NOT NULL,
+        last_serial INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (vehicle_model, date_code)
+      );
+    ''');
+
+    try {
+      db.execute('''
+        INSERT INTO serial_tracker_v2 (vehicle_model, date_code, last_serial)
+        SELECT vehicle_model, last_date, last_serial FROM serial_tracker
+        WHERE last_date IS NOT NULL AND TRIM(last_date) != '';
+      ''');
+    } catch (_) {}
+
+    db.execute('DROP TABLE serial_tracker;');
+    db.execute('ALTER TABLE serial_tracker_v2 RENAME TO serial_tracker;');
+  }
+
   static List<Map<String, dynamic>> getAllMasters() {
     final res = db.select('SELECT * FROM vehicle_master ORDER BY id DESC');
     return res.map((row) => Map<String, dynamic>.from(row)).toList();
@@ -87,14 +121,15 @@ class ServerDatabase {
 
   static void saveMaster(Map<String, dynamic> data) {
     final stmt = db.prepare('''
-      INSERT INTO vehicle_master (vehicle_model, customer_part_no, part_no, date_of_mfg, fixed_qr_code, company_logo)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO vehicle_master (vehicle_model, customer_part_no, part_no, date_of_mfg, fixed_qr_code, company_logo, show_keep_up_arrow)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(vehicle_model) DO UPDATE SET
         customer_part_no=excluded.customer_part_no,
         part_no=excluded.part_no,
         date_of_mfg=excluded.date_of_mfg,
         fixed_qr_code=excluded.fixed_qr_code,
-        company_logo=excluded.company_logo;
+        company_logo=excluded.company_logo,
+        show_keep_up_arrow=excluded.show_keep_up_arrow;
     ''');
     stmt.execute([
       data['vehicle_model'],
@@ -103,6 +138,7 @@ class ServerDatabase {
       data['date_of_mfg'] ?? '',
       data['fixed_qr_code'] ?? '0000ND22211000020365',
       data['company_logo'] ?? 'none',
+      0,
     ]);
     stmt.dispose();
   }
@@ -114,34 +150,39 @@ class ServerDatabase {
   }
 
   static void resetSerial(String model) {
-    final stmt = db.prepare('DELETE FROM serial_tracker WHERE LOWER(vehicle_model) = ?');
-    stmt.execute([model.toLowerCase().trim()]);
+    final stmt = db.prepare(
+      'DELETE FROM serial_tracker WHERE LOWER(vehicle_model) = LOWER(?)',
+    );
+    stmt.execute([model.trim()]);
     stmt.dispose();
   }
 
+  static const int kDailySerialLimit = 999;
+
   static int getNextSerialAndIncrement(String model, String dateCode) {
+    final normalizedModel = model.trim();
     final res = db.select(
-      'SELECT last_serial, last_date FROM serial_tracker WHERE LOWER(vehicle_model) = ?',
-      [model.toLowerCase()],
+      'SELECT last_serial FROM serial_tracker WHERE LOWER(vehicle_model) = LOWER(?) AND date_code = ?',
+      [normalizedModel.toLowerCase(), dateCode],
     );
 
     int nextSerial = 1;
     if (res.isNotEmpty) {
-      final savedDate = res.first['last_date']?.toString() ?? '';
       final lastSerial = res.first['last_serial'] as int? ?? 0;
-      if (savedDate == dateCode) {
-        nextSerial = lastSerial + 1;
-      }
+      nextSerial = lastSerial + 1;
+    }
+
+    if (nextSerial > kDailySerialLimit) {
+      throw StateError('Daily limit of 999 reached for this model');
     }
 
     final updateStmt = db.prepare('''
-      INSERT INTO serial_tracker (vehicle_model, last_serial, last_date)
+      INSERT INTO serial_tracker (vehicle_model, date_code, last_serial)
       VALUES (?, ?, ?)
-      ON CONFLICT(vehicle_model) DO UPDATE SET
-        last_serial=excluded.last_serial,
-        last_date=excluded.last_date;
+      ON CONFLICT(vehicle_model, date_code) DO UPDATE SET
+        last_serial=excluded.last_serial;
     ''');
-    updateStmt.execute([model, nextSerial, dateCode]);
+    updateStmt.execute([normalizedModel, dateCode, nextSerial]);
     updateStmt.dispose();
 
     return nextSerial;

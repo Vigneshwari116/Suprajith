@@ -2,8 +2,12 @@ import 'dart:typed_data';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:svenska/core/constants/label_config.dart';
+import 'u350_label_layout.dart';
 
 class FrontendLabelEngine {
+  static final pw.Font _helveticaBold = pw.Font.helveticaBold();
+
   /// 50x25 mm Industrial Layout
   static Future<Uint8List> build50x25Pdf({
     required String model,
@@ -13,25 +17,30 @@ class FrontendLabelEngine {
     required String qrPayload,
     pw.MemoryImage? logoImage,
   }) async {
+    if (showKeepUpExtras(model)) {
+      return _buildU350_50x25Pdf(
+        model: model,
+        customerPartNo: customerPartNo,
+        partNo: partNo,
+        mfgDate: mfgDate,
+        qrPayload: qrPayload,
+        logoImage: logoImage,
+      );
+    }
+
     final doc = pw.Document();
     doc.addPage(
       pw.Page(
-        pageFormat: const PdfPageFormat(
-          5.0 * PdfPageFormat.cm,
-          2.5 * PdfPageFormat.cm,
-          marginAll: 0.1 * PdfPageFormat.cm,
-        ),
+        pageFormat: kLabel50x25PageFormat,
         build: (pw.Context context) {
           return pw.Container(
-            // NOTE: color property ko hata kar decoration ke andar rakha gaya hai
             decoration: const pw.BoxDecoration(
               color: PdfColors.white,
             ),
-            padding: const pw.EdgeInsets.symmetric(horizontal: 1.5, vertical: 1.0),
+            padding: const pw.EdgeInsets.symmetric(horizontal: 1.2, vertical: 0.8),
             child: pw.Row(
               crossAxisAlignment: pw.CrossAxisAlignment.center,
               children: [
-                // LEFT SIDE: Logo & QR Code
                 pw.SizedBox(
                   width: 44,
                   child: pw.Column(
@@ -64,8 +73,6 @@ class FrontendLabelEngine {
                   ),
                 ),
                 pw.SizedBox(width: 4),
-
-                // RIGHT SIDE: Details List
                 pw.Expanded(
                   child: pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -90,6 +97,202 @@ class FrontendLabelEngine {
     return await doc.save();
   }
 
+  static Future<Uint8List> _buildU350_50x25Pdf({
+    required String model,
+    required String customerPartNo,
+    required String partNo,
+    required String mfgDate,
+    required String qrPayload,
+    pw.MemoryImage? logoImage,
+  }) async {
+    final values = [model, customerPartNo, partNo, mfgDate];
+    final blockFontPt = U350LabelLayout.resolveTextBlockFontPt(values);
+    final labels = [
+      'Vehicle Model',
+      'Customer Part No',
+      'Suprajit Part No',
+      'Date of MFG',
+    ];
+
+    final doc = pw.Document();
+    doc.addPage(
+      pw.Page(
+        pageFormat: U350LabelLayout.pageFormat,
+        build: (pw.Context context) {
+          return pw.SizedBox(
+            width: U350LabelLayout.mmToPdfPoints(U350LabelLayout.pageWidthMm),
+            height: U350LabelLayout.mmToPdfPoints(U350LabelLayout.pageHeightMm),
+            child: pw.Stack(
+              children: [
+                if (logoImage != null)
+                  pw.Positioned(
+                    left: U350LabelLayout.mmToPdfPoints(U350LabelLayout.logoLeftMm),
+                    top: U350LabelLayout.mmToPdfPoints(U350LabelLayout.logoTopMm),
+                    child: pw.SizedBox(
+                      width: U350LabelLayout.mmToPdfPoints(U350LabelLayout.logoWidthMm),
+                      height: U350LabelLayout.mmToPdfPoints(U350LabelLayout.logoHeightMm),
+                      child: pw.Image(logoImage, fit: pw.BoxFit.contain),
+                    ),
+                  )
+                else
+                  pw.Positioned(
+                    left: U350LabelLayout.mmToPdfPoints(U350LabelLayout.logoLeftMm),
+                    top: U350LabelLayout.mmToPdfPoints(U350LabelLayout.logoTopMm),
+                    child: pw.SizedBox(
+                      width: U350LabelLayout.mmToPdfPoints(U350LabelLayout.logoWidthMm),
+                      height: U350LabelLayout.mmToPdfPoints(U350LabelLayout.logoHeightMm),
+                      child: pw.Center(
+                      child: pw.Text(
+                        'SVENSKA',
+                        style: pw.TextStyle(
+                          font: _helveticaBold,
+                          fontSize: 5,
+                          color: PdfColors.black,
+                        ),
+                      ),
+                    ),
+                    ),
+                  ),
+                for (var i = 0; i < labels.length; i++) ...[
+                  pw.Positioned(
+                    left: U350LabelLayout.mmToPdfPoints(U350LabelLayout.textBlockLeftMm),
+                    top: U350LabelLayout.mmToPdfPoints(
+                      U350LabelLayout.textFirstRowTopMm + i * U350LabelLayout.textRowPitchMm,
+                    ),
+                    child: pw.SizedBox(
+                      width: U350LabelLayout.mmToPdfPoints(U350LabelLayout.labelColumnWidthMm),
+                      child: pw.Text(
+                      '${labels[i]} :',
+                      maxLines: 1,
+                      style: pw.TextStyle(
+                        font: _helveticaBold,
+                        fontSize: blockFontPt,
+                        color: PdfColors.black,
+                      ),
+                    ),
+                    ),
+                  ),
+                  pw.Positioned(
+                    left: U350LabelLayout.mmToPdfPoints(U350LabelLayout.valueColumnLeftMm),
+                    top: U350LabelLayout.mmToPdfPoints(
+                      U350LabelLayout.textFirstRowTopMm + i * U350LabelLayout.textRowPitchMm,
+                    ),
+                    child: pw.SizedBox(
+                      width: U350LabelLayout.mmToPdfPoints(
+                        U350LabelLayout.textMaxRightMm - U350LabelLayout.valueColumnLeftMm,
+                      ),
+                      child: pw.Text(
+                      values[i],
+                      maxLines: 1,
+                      style: pw.TextStyle(
+                        font: _helveticaBold,
+                        fontSize: blockFontPt,
+                        color: PdfColors.black,
+                      ),
+                    ),
+                    ),
+                  ),
+                ],
+                pw.Positioned(
+                  left: U350LabelLayout.mmToPdfPoints(U350LabelLayout.qrLeftMm),
+                  top: U350LabelLayout.mmToPdfPoints(U350LabelLayout.qrTopMm),
+                  child: pw.SizedBox(
+                    width: U350LabelLayout.mmToPdfPoints(U350LabelLayout.qrSizeMm),
+                    height: U350LabelLayout.mmToPdfPoints(U350LabelLayout.qrSizeMm),
+                    child: pw.BarcodeWidget(
+                    barcode: pw.Barcode.qrCode(errorCorrectLevel: pw.BarcodeQRCorrectionLevel.low),
+                    data: qrPayload,
+                    width: U350LabelLayout.mmToPdfPoints(U350LabelLayout.qrSizeMm),
+                    height: U350LabelLayout.mmToPdfPoints(U350LabelLayout.qrSizeMm),
+                    color: PdfColors.black,
+                    drawText: false,
+                    ),
+                  ),
+                ),
+                pw.Positioned(
+                  left: U350LabelLayout.mmToPdfPoints(U350LabelLayout.keepUpLeftMm),
+                  top: U350LabelLayout.mmToPdfPoints(U350LabelLayout.keepUpTopMm),
+                  child: pw.Text(
+                    'KEEP UP RIGHT',
+                    style: pw.TextStyle(
+                      font: _helveticaBold,
+                      fontSize: U350LabelLayout.keepUpFontPt,
+                      color: PdfColors.black,
+                    ),
+                  ),
+                ),
+                pw.Positioned(
+                  left: 0,
+                  top: U350LabelLayout.mmToPdfPoints(U350LabelLayout.madeInIndiaTopMm),
+                  child: pw.SizedBox(
+                    width: U350LabelLayout.mmToPdfPoints(U350LabelLayout.pageWidthMm),
+                    child: pw.Align(
+                    alignment: pw.Alignment(
+                      (U350LabelLayout.madeInIndiaCenterXMm / U350LabelLayout.pageWidthMm) * 2 - 1,
+                      -1,
+                    ),
+                    child: pw.Text(
+                      'MADE IN INDIA',
+                      style: pw.TextStyle(
+                        font: _helveticaBold,
+                        fontSize: U350LabelLayout.madeInIndiaFontPt,
+                        color: PdfColors.black,
+                      ),
+                    ),
+                  ),
+                  ),
+                ),
+                ..._buildU350UpArrowPdfWidgets(),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+    return await doc.save();
+  }
+
+  /// Arrow as [pw.Positioned] widgets: shaft = filled rect (reliable on all drivers),
+  /// head = small [pw.CustomPaint] triangle (PdfGraphics y-up within the head box).
+  static List<pw.Widget> _buildU350UpArrowPdfWidgets() {
+    final mm = U350LabelLayout.mmToPdfPoints;
+    final headHm = U350LabelLayout.arrowHeadHeightMm;
+    final shaftHm = U350LabelLayout.arrowHeightMm - headHm;
+    final headW = mm(U350LabelLayout.arrowWidthMm);
+    final headH = mm(headHm);
+
+    return [
+      pw.Positioned(
+        left: mm(U350LabelLayout.arrowShaftLeftMm),
+        top: mm(U350LabelLayout.arrowTopMm + headHm),
+        child: pw.Container(
+          width: mm(U350LabelLayout.arrowShaftWidthMm),
+          height: mm(shaftHm),
+          color: PdfColors.black,
+        ),
+      ),
+      pw.Positioned(
+        left: mm(U350LabelLayout.arrowLeftMm),
+        top: mm(U350LabelLayout.arrowTopMm),
+        child: pw.SizedBox(
+          width: headW,
+          height: headH,
+          child: pw.CustomPaint(
+            size: PdfPoint(headW, headH),
+            painter: (PdfGraphics canvas, PdfPoint size) {
+              canvas.setFillColor(PdfColors.black);
+              canvas.moveTo(size.x / 2, size.y);
+              canvas.lineTo(size.x, 0);
+              canvas.lineTo(0, 0);
+              canvas.closePath();
+              canvas.fillPath();
+            },
+          ),
+        ),
+      ),
+    ];
+  }
+
   /// 100x50 mm Industrial Layout
   static Future<Uint8List> build100x50Pdf({
     required String model,
@@ -110,7 +313,6 @@ class FrontendLabelEngine {
         ),
         build: (pw.Context context) {
           return pw.Container(
-            // NOTE: color property yahan se hata di gayi hai aur BoxDecoration ke andar color set hai
             decoration: pw.BoxDecoration(
               color: PdfColors.white,
               border: pw.Border.all(color: PdfColors.black, width: 1.0),
@@ -181,12 +383,12 @@ class FrontendLabelEngine {
       crossAxisAlignment: pw.CrossAxisAlignment.center,
       children: [
         pw.SizedBox(
-          width: 48,
+          width: 42,
           child: pw.Text(label, style: pw.TextStyle(fontSize: 4.8, fontWeight: pw.FontWeight.bold, color: PdfColors.black)),
         ),
         pw.Text(': ', style: pw.TextStyle(fontSize: 4.8, fontWeight: pw.FontWeight.bold, color: PdfColors.black)),
         pw.Expanded(
-          child: pw.Text(val, maxLines: 1, style: pw.TextStyle(fontSize: 5.2, fontWeight: pw.FontWeight.bold, color: PdfColors.black)),
+          child: pw.Text(val, maxLines: 1, style: pw.TextStyle(fontSize: 5.0, fontWeight: pw.FontWeight.bold, color: PdfColors.black)),
         ),
       ],
     );
@@ -211,6 +413,7 @@ class FrontendLabelEngine {
     required Uint8List pdfBytes,
     required String printerName,
     required String jobName,
+    PdfPageFormat pageFormat = kLabel50x25PageFormat,
   }) async {
     final printers = await Printing.listPrinters();
     Printer? target;
@@ -227,6 +430,9 @@ class FrontendLabelEngine {
         printer: target,
         onLayout: (PdfPageFormat format) async => pdfBytes,
         name: jobName,
+        format: pageFormat,
+        dynamicLayout: false,
+        usePrinterSettings: true,
       );
       if (!success) {
         throw Exception('Direct print was rejected by driver for "$printerName".');
@@ -235,6 +441,9 @@ class FrontendLabelEngine {
       await Printing.layoutPdf(
         onLayout: (PdfPageFormat format) async => pdfBytes,
         name: jobName,
+        format: pageFormat,
+        dynamicLayout: false,
+        usePrinterSettings: true,
       );
     }
   }
