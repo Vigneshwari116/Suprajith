@@ -170,7 +170,7 @@ class FrontendLabelEngine {
                     child: pw.SizedBox(
                       width: U350LabelLayout.mmToPdfPoints(U350LabelLayout.labelColumnWidthMm),
                       child: pw.Text(
-                      labels[i],
+                      '${labels[i]} :',
                       maxLines: 1,
                       style: pw.TextStyle(
                         font: _helveticaBold,

@@ -62,7 +62,7 @@ class U350LabelPreview extends StatelessWidget {
               top: _px(U350LabelLayout.textFirstRowTopMm + i * U350LabelLayout.textRowPitchMm),
               width: _px(U350LabelLayout.labelColumnWidthMm),
               child: Text(
-                labels[i],
+                '${labels[i]} :',
                 maxLines: 1,
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
