@@ -60,6 +60,17 @@ void main() {
     }
   });
 
+  test('preparePrint uses print-time MFG date not master date_of_mfg', () {
+    seedMaster();
+    final res = service.preparePrint(
+      modelQuery: 'TEST-U350',
+      labelSize: '50x25',
+      printAt: DateTime(2026, 3, 15),
+    );
+    expect(res['status'], 'success');
+    expect(res['mfg_date'], '15.03.2026');
+  });
+
   test('fixed QR must be 19 chars and daily limit message', () {
     final bad = service.saveMaster({
       'vehicle_model': 'BAD',

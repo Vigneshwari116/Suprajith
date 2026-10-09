@@ -244,6 +244,7 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
         data = sl<LocalLabelService>().preparePrint(
           modelQuery: matched.vehicleModel,
           labelSize: _selectedLabelSize,
+          printAt: printMoment,
         );
       } else {
         final response = await sl<ApiClient>().post(
@@ -267,6 +268,7 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
         final String fullPayload = data['full_payload']?.toString() ?? '';
 
         final logoImage = await LogoAssetResolver.getLogoImage(matched.companyLogo);
+        final labelMfgDate = data['mfg_date']?.toString() ?? formattedDate;
 
         final Uint8List pdfBytes;
         if (_selectedLabelSize == '100x50') {
@@ -274,7 +276,7 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
             model: matched.vehicleModel,
             custPart: matched.customerPartNo,
             partNo: matched.partNo,
-            mfgDate: formattedDate,
+            mfgDate: labelMfgDate,
             serial: serialStr,
             qrPayload: fullPayload,
             logoImage: logoImage,
@@ -284,7 +286,7 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
             model: matched.vehicleModel,
             customerPartNo: matched.customerPartNo,
             partNo: matched.partNo,
-            mfgDate: formattedDate,
+            mfgDate: labelMfgDate,
             qrPayload: fullPayload,
             logoImage: logoImage,
           );
@@ -303,7 +305,7 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
           'model': matched.vehicleModel,
           'customer_part_no': matched.customerPartNo,
           'part_no': matched.partNo,
-          'date_of_mfg': formattedDate,
+          'date_of_mfg': labelMfgDate,
           'qr_data': fullPayload,
           'sn': serialStr,
           'size': _selectedLabelSize,

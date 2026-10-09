@@ -158,13 +158,14 @@ class _PrintHistoryAuditModalState extends State<PrintHistoryAuditModal> {
 
     try {
       final logoImage = await LogoAssetResolver.getLogoImage(item.companyLogo);
+      final reprintMfgDate = DateFormat('dd.MM.yyyy').format(DateTime.now());
       final Uint8List pdfBytes;
       if (chosenSize == '100x50') {
         pdfBytes = await FrontendLabelEngine.build100x50Pdf(
           model: item.vehicleModel,
           custPart: item.customerPartNo,
           partNo: item.partNo,
-          mfgDate: item.dateOfMfg,
+          mfgDate: reprintMfgDate,
           serial: item.serialNo,
           qrPayload: item.fullQrData,
           logoImage: logoImage,
@@ -174,7 +175,7 @@ class _PrintHistoryAuditModalState extends State<PrintHistoryAuditModal> {
           model: item.vehicleModel,
           customerPartNo: item.customerPartNo,
           partNo: item.partNo,
-          mfgDate: item.dateOfMfg,
+          mfgDate: reprintMfgDate,
           qrPayload: item.fullQrData,
           logoImage: logoImage,
         );
