@@ -136,12 +136,12 @@ class _MasterManagementModalState extends State<MasterManagementModal> {
       return;
     }
 
-    if (fixedQr.length != 20) {
+    if (fixedQr.length != 19) {
       setState(() {
-        _qrValidationError = "Fixed QR must be exactly 20 characters (current: ${fixedQr.length})";
+        _qrValidationError = "Fixed QR must be exactly 19 characters (current: ${fixedQr.length})";
       });
       _fnQr.requestFocus();
-      _showToast("Validation Failed: Fixed QR must be exactly 20 characters!", isError: true);
+      _showToast("Validation Failed: Fixed QR must be exactly 19 characters!", isError: true);
       return;
     }
 
@@ -347,14 +347,14 @@ class _MasterManagementModalState extends State<MasterManagementModal> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text("5. Fixed QR Code (20 Characters) *",
+            const Text("5. Fixed QR Code (19 Characters) *",
                 style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black)),
             Text(
-              "${_fixedQrCtrl.text.length}/20",
+              "${_fixedQrCtrl.text.length}/19",
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.bold,
-                color: _fixedQrCtrl.text.length == 20 ? Colors.green : Colors.red,
+                color: _fixedQrCtrl.text.length == 19 ? Colors.green : Colors.red,
               ),
             ),
           ],
@@ -365,15 +365,15 @@ class _MasterManagementModalState extends State<MasterManagementModal> {
           child: TextField(
             controller: _fixedQrCtrl,
             focusNode: _fnQr,
-            maxLength: 20,
+            maxLength: 19,
             maxLengthEnforcement: MaxLengthEnforcement.enforced,
             inputFormatters: [
-              LengthLimitingTextInputFormatter(20),
+              LengthLimitingTextInputFormatter(19),
             ],
             onChanged: (val) {
               setState(() {
-                if (val.length != 20) {
-                  _qrValidationError = "Must be exactly 20 characters";
+                if (val.length != 19) {
+                  _qrValidationError = "Must be exactly 19 characters";
                 } else {
                   _qrValidationError = null;
                 }
@@ -382,7 +382,7 @@ class _MasterManagementModalState extends State<MasterManagementModal> {
             onSubmitted: (_) => _saveMaster(),
             decoration: InputDecoration(
               counterText: "",
-              hintText: "Enter 20-character fixed QR code",
+              hintText: "Enter 19-character fixed QR code",
               hintStyle: const TextStyle(fontSize: 11, color: Color(0xFF475569)),
               prefixIcon: const Icon(Icons.qr_code_2, size: 16),
               border: const OutlineInputBorder(),
@@ -520,7 +520,7 @@ class _MasterManagementModalState extends State<MasterManagementModal> {
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0.5),
                                   decoration: BoxDecoration(
-                                    color: item.fixedQrCode.length == 20 ? Colors.green.shade50 : Colors.red.shade50,
+                                    color: item.fixedQrCode.length == 19 ? Colors.green.shade50 : Colors.red.shade50,
                                     borderRadius: BorderRadius.circular(2),
                                   ),
                                   child: Text(
@@ -528,7 +528,7 @@ class _MasterManagementModalState extends State<MasterManagementModal> {
                                     style: TextStyle(
                                       fontSize: 8.5,
                                       fontWeight: FontWeight.bold,
-                                      color: item.fixedQrCode.length == 20 ? Colors.green.shade800 : Colors.red.shade800,
+                                      color: item.fixedQrCode.length == 19 ? Colors.green.shade800 : Colors.red.shade800,
                                     ),
                                   ),
                                 ),

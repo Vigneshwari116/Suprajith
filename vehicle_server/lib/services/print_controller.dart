@@ -29,10 +29,10 @@ class PrintController {
         return jsonRes({'status': 'error', 'message': 'vehicle_model required'}, statusCode: 400);
       }
 
-      if (fixedQr.length != 20) {
+      if (fixedQr.length != 19) {
         return jsonRes({
           'status': 'error',
-          'message': 'fixed_qr_code must be exactly 20 characters (Received: ${fixedQr.length})'
+          'message': 'fixed_qr_code must be exactly 19 characters (Received: ${fixedQr.length})'
         }, statusCode: 400);
       }
 
@@ -72,13 +72,13 @@ class PrintController {
         return jsonRes({'status': 'error', 'message': 'Model not found in database'}, statusCode: 404);
       }
 
-      // 1. Fixed QR Code check (exactly 20 characters)
+      // 1. Fixed QR Code check (exactly 19 characters)
       final fixedQr = master['fixed_qr_code']?.toString().trim() ?? '';
-      if (fixedQr.length != 20) {
+      if (fixedQr.length != 19) {
         return jsonRes({
           'status': 'error',
           'message':
-              'Master fixed QR code must be exactly 20 characters (current: ${fixedQr.length}). Please update in Master Management.'
+              'Master fixed QR code must be exactly 19 characters (current: ${fixedQr.length}). Please update in Master Management.'
         }, statusCode: 400);
       }
 
@@ -100,7 +100,7 @@ class PrintController {
       }
       final serialStr = nextSerial.toString().padLeft(4, '0');
 
-      // 4. Final QR Payload: 20-char fixed + date/month/year code + AA + 4-digit serial (30 total)
+      // 4. Final QR Payload: 19-char fixed + date/month/year code + AA + 4-digit serial (29 total)
       final fullPayload = '$fixedQr$dateShiftCode$serialStr';
 
       final clientIp = req.headers['x-forwarded-for'] ??

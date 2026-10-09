@@ -245,10 +245,10 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
     }
 
     final masterFixedQr = matched.fixedQrCode.trim();
-    if (masterFixedQr.length != 20) {
+    if (masterFixedQr.length != 19) {
       setState(() => _validationError =
-      "Fixed QR must be exactly 20 characters! Current has ${masterFixedQr.length}. Edit in Master Entry.");
-      _showToast("Invalid Master QR length: Expected exactly 20 characters", isError: true);
+      "Fixed QR must be exactly 19 characters! Current has ${masterFixedQr.length}. Edit in Master Entry.");
+      _showToast("Invalid Master QR length: Expected exactly 19 characters", isError: true);
       _scannerFocusNode.requestFocus();
       return;
     }
@@ -468,7 +468,7 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
           color: kAccent,
         ),
         decoration: InputDecoration(
-          labelText: "Fixed QR Code (20 Digits)",
+          labelText: "Fixed QR Code (19 Digits)",
           labelStyle: const TextStyle(fontSize: 11, color: kTextSecondary),
           floatingLabelBehavior: FloatingLabelBehavior.always,
           hintText: "[Select Model to View QR]",

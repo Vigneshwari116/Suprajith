@@ -2,13 +2,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:svenska/core/services/automotive_date_encoder.dart';
 
 void main() {
-  const fixed = '0000N822126000020365';
+  const fixed = '0000N82212600020365';
 
-  String fullQr(DateTime date) {
+  String fullQr(DateTime date, {int serial = 1}) {
     return AutomotiveDateEncoder.buildFullQrPayload(
-      fixedQr20: fixed,
+      fixedQr: fixed,
       date: date,
-      serial: 1,
+      serial: serial,
     );
   }
 
@@ -26,25 +26,40 @@ void main() {
   test('full QR test vectors with serial 0001', () {
     expect(
       fullQr(DateTime(2026, 9, 25)),
-      '0000N822126000020365S926AA0001',
+      '0000N82212600020365S926AA0001',
     );
     expect(
       fullQr(DateTime(2026, 10, 8)),
-      '0000N8221260000203658A26AA0001',
+      '0000N822126000203658A26AA0001',
     );
     expect(
       fullQr(DateTime(2026, 10, 9)),
-      '0000N8221260000203659A26AA0001',
+      '0000N822126000203659A26AA0001',
     );
     expect(
       fullQr(DateTime(2026, 8, 31)),
-      '0000N822126000020365Y826AA0001',
+      '0000N82212600020365Y826AA0001',
     );
   });
 
-  test('fixed part is 20 chars and full payload is 30 chars', () {
-    final payload = fullQr(DateTime(2026, 10, 9));
-    expect(fixed.length, 20);
-    expect(payload.length, 30);
+  test('full QR with serial 0451 on 21.08.2026', () {
+    expect(
+      fullQr(DateTime(2026, 8, 21), serial: 451),
+      '0000N82212600020365M826AA0451',
+    );
+  });
+
+  test('fixed part is 19 chars and every full payload is 29 chars', () {
+    expect(fixed.length, 19);
+    final samples = [
+      fullQr(DateTime(2026, 9, 25)),
+      fullQr(DateTime(2026, 10, 8)),
+      fullQr(DateTime(2026, 10, 9)),
+      fullQr(DateTime(2026, 8, 31)),
+      fullQr(DateTime(2026, 8, 21), serial: 451),
+    ];
+    for (final payload in samples) {
+      expect(payload.length, 29);
+    }
   });
 }

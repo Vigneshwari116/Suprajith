@@ -23,7 +23,7 @@ void main() {
       customerPartNo: 'N6222510',
       partNo: 'OFG-SPM-00033',
       mfgDate: '31.08.2026',
-      qrPayload: '0000N822126000020365Y826AA0001',
+      qrPayload: '0000N82212600020365Y826AA0001',
     );
     expect(bytes, isNotEmpty);
 
@@ -36,7 +36,7 @@ void main() {
   });
 
   testWidgets('U350 preview uses 360x180 and positioned layout coordinates', (tester) async {
-    const qr = '0000N822126000020365Y826AA0001';
+    const qr = '0000N82212600020365Y826AA0001';
     await tester.pumpWidget(
       const MaterialApp(
         home: Scaffold(

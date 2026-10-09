@@ -19,13 +19,13 @@ class AutomotiveDateEncoder {
     return '$dCode$mCode$yCode$shift';
   }
 
-  /// Builds the full 30-character QR payload from fixed part, date, and serial.
+  /// Builds the full 29-character QR payload from fixed part, date, and serial.
   static String buildFullQrPayload({
-    required String fixedQr20,
+    required String fixedQr,
     required DateTime date,
     required int serial,
   }) {
     final serialStr = serial.toString().padLeft(4, '0');
-    return '$fixedQr20${encode(date)}$serialStr';
+    return '$fixedQr${encode(date)}$serialStr';
   }
 }
