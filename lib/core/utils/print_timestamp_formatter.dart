@@ -45,4 +45,33 @@ class PrintTimestampFormatter {
     if (parsed == null) return false;
     return isSameLocalDay(parsed, day);
   }
+
+  /// Grouping label for audit lists: always `dd.MM.yyyy`.
+  static final DateFormat _groupLabelFormat = DateFormat('dd.MM.yyyy');
+
+  static String groupDateLabel(String? raw) {
+    final parsed = tryParsePrintedAt(raw);
+    if (parsed == null) {
+      final fallback = raw?.split(' ').first.trim();
+      return fallback == null || fallback.isEmpty ? 'Unknown' : fallback;
+    }
+    return _groupLabelFormat.format(parsed);
+  }
+
+  static DateTime? tryParseGroupDateLabel(String label) {
+    try {
+      return _groupLabelFormat.parseStrict(label);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static String timeOfDayFromRaw(String? raw) {
+    final parsed = tryParsePrintedAt(raw);
+    if (parsed == null) {
+      final parts = raw?.split(' ');
+      return parts != null && parts.length > 1 ? parts[1] : '';
+    }
+    return DateFormat('HH:mm:ss').format(parsed);
+  }
 }

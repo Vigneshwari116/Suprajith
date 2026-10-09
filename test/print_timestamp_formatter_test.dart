@@ -21,4 +21,15 @@ void main() {
   test('unknown timestamp returns raw string for display', () {
     expect(PrintTimestampFormatter.displayFromRaw('not-a-date'), 'not-a-date');
   });
+
+  test('groupDateLabel normalizes ISO and legacy to dd.MM.yyyy', () {
+    expect(
+      PrintTimestampFormatter.groupDateLabel('2026-10-09 23:16:54'),
+      '09.10.2026',
+    );
+    expect(
+      PrintTimestampFormatter.groupDateLabel('09.10.2026 16:36:34'),
+      '09.10.2026',
+    );
+  });
 }

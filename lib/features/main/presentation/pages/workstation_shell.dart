@@ -15,11 +15,12 @@ class WorkstationShell extends StatefulWidget {
 }
 
 class _WorkstationShellState extends State<WorkstationShell> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+
   int _selectedIndex(String location) {
     if (location.startsWith(AppRoutes.workstationMasters)) return 1;
-    if (location.startsWith(AppRoutes.workstationTransactions)) return 2;
-    if (location.startsWith(AppRoutes.workstationReports)) return 3;
-    if (location.startsWith(AppRoutes.workstationBackup)) return 4;
+    if (location.startsWith(AppRoutes.workstationReports)) return 2;
+    if (location.startsWith(AppRoutes.workstationBackup)) return 3;
     return 0;
   }
 
@@ -28,18 +29,17 @@ class _WorkstationShellState extends State<WorkstationShell> {
       case 1:
         return 'Masters';
       case 2:
-        return 'Transactions';
-      case 3:
         return 'Reports';
-      case 4:
+      case 3:
         return 'Backup';
       default:
-        return 'Main screen';
+        return 'Transaction';
     }
   }
 
   void _navigate(BuildContext context, String route) {
     context.go(route);
+    _scaffoldKey.currentState?.closeDrawer();
   }
 
   Future<void> _confirmLogout(BuildContext context) async {
@@ -58,7 +58,79 @@ class _WorkstationShellState extends State<WorkstationShell> {
     if (kUseLocalDataStore) {
       sl<AuthService>().logout();
     }
+    _scaffoldKey.currentState?.closeDrawer();
     context.go(AppRoutes.login);
+  }
+
+  Widget _drawerNav(BuildContext context, int selected) {
+    return Drawer(
+      child: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 16, 16, 12),
+              child: Row(
+                children: [
+                  Icon(Icons.qr_code_2_rounded, color: Color(0xFF0F172A), size: 22),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'SVENSKA AUTOMOTIVE',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.indigoAccent),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                children: [
+                  _SideNavItem(
+                    label: 'Transaction',
+                    icon: Icons.print_outlined,
+                    selected: selected == 0,
+                    onTap: () => _navigate(context, AppRoutes.workstationMain),
+                  ),
+                  _SideNavItem(
+                    label: 'Masters',
+                    icon: Icons.storage_outlined,
+                    selected: selected == 1,
+                    onTap: () => _navigate(context, AppRoutes.workstationMasters),
+                  ),
+                  _SideNavItem(
+                    label: 'Reports',
+                    icon: Icons.assessment_outlined,
+                    selected: selected == 2,
+                    onTap: () => _navigate(context, AppRoutes.workstationReports),
+                  ),
+                  _SideNavItem(
+                    label: 'Backup',
+                    icon: Icons.backup_outlined,
+                    selected: selected == 3,
+                    onTap: () => _navigate(context, AppRoutes.workstationBackup),
+                  ),
+                ],
+              ),
+            ),
+            if (kUseLocalDataStore) ...[
+              const Divider(height: 1),
+              Padding(
+                padding: const EdgeInsets.all(8),
+                child: _SideNavItem(
+                  label: 'Logout',
+                  icon: Icons.logout,
+                  selected: false,
+                  onTap: () => _confirmLogout(context),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -67,103 +139,28 @@ class _WorkstationShellState extends State<WorkstationShell> {
     final selected = _selectedIndex(location);
 
     return Scaffold(
+      key: _scaffoldKey,
       backgroundColor: const Color(0xFFF1F5F9),
-      body: Row(
+      drawer: _drawerNav(context, selected),
+      body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Material(
             color: Colors.white,
-            elevation: 1,
-            child: SizedBox(
-              width: 200,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Padding(
-                    padding: EdgeInsets.fromLTRB(14, 16, 14, 12),
-                    child: Row(
-                      children: [
-                        Icon(Icons.qr_code_2_rounded, color: Color(0xFF0F172A), size: 22),
-                        SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'SVENSKA AUTOMOTIVE',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 11,
-                              color: Colors.indigoAccent,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Divider(height: 1, color: Color(0xFFCBD5E1)),
-                  Expanded(
-                    child: ListView(
-                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-                      children: [
-                        _SideNavItem(
-                          label: 'Main screen',
-                          icon: Icons.home_outlined,
-                          selected: selected == 0,
-                          onTap: () => _navigate(context, AppRoutes.workstationMain),
-                        ),
-                        _SideNavItem(
-                          label: 'Masters',
-                          icon: Icons.storage_outlined,
-                          selected: selected == 1,
-                          onTap: () => _navigate(context, AppRoutes.workstationMasters),
-                        ),
-                        _SideNavItem(
-                          label: 'Transactions',
-                          icon: Icons.receipt_long_outlined,
-                          selected: selected == 2,
-                          onTap: () => _navigate(context, AppRoutes.workstationTransactions),
-                        ),
-                        _SideNavItem(
-                          label: 'Reports',
-                          icon: Icons.assessment_outlined,
-                          selected: selected == 3,
-                          onTap: () => _navigate(context, AppRoutes.workstationReports),
-                        ),
-                        _SideNavItem(
-                          label: 'Backup',
-                          icon: Icons.backup_outlined,
-                          selected: selected == 4,
-                          onTap: () => _navigate(context, AppRoutes.workstationBackup),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (kUseLocalDataStore) ...[
-                    const Divider(height: 1, color: Color(0xFFCBD5E1)),
-                    Padding(
-                      padding: const EdgeInsets.all(8),
-                      child: _SideNavItem(
-                        label: 'Logout',
-                        icon: Icons.logout,
-                        selected: false,
-                        onTap: () => _confirmLogout(context),
-                      ),
-                    ),
-                  ],
-                ],
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: const BoxDecoration(
+                border: Border(bottom: BorderSide(color: Color(0xFFCBD5E1))),
               ),
-            ),
-          ),
-          const VerticalDivider(width: 1, color: Color(0xFFCBD5E1)),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Material(
-                  color: Colors.white,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    decoration: const BoxDecoration(
-                      border: Border(bottom: BorderSide(color: Color(0xFFCBD5E1))),
-                    ),
+              child: Row(
+                children: [
+                  IconButton(
+                    tooltip: 'Open menu',
+                    icon: const Icon(Icons.menu, size: 22),
+                    color: const Color(0xFF2563EB),
+                    onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+                  ),
+                  Expanded(
                     child: Text(
                       _pageTitle(selected),
                       style: const TextStyle(
@@ -173,11 +170,11 @@ class _WorkstationShellState extends State<WorkstationShell> {
                       ),
                     ),
                   ),
-                ),
-                Expanded(child: widget.child),
-              ],
+                ],
+              ),
             ),
           ),
+          Expanded(child: widget.child),
         ],
       ),
     );
