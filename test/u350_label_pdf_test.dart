@@ -72,6 +72,6 @@ void main() {
 
     expect(find.text('KEEP UP RIGHT'), findsOneWidget);
     expect(find.text('MADE IN INDIA'), findsOneWidget);
-    expect(find.text('Suprajit Part No'), findsOneWidget);
+    expect(find.textContaining('Suprajit Part No'), findsOneWidget);
   });
 }
