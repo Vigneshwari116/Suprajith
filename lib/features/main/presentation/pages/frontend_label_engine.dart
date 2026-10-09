@@ -12,6 +12,7 @@ class FrontendLabelEngine {
     required String mfgDate,
     required String qrPayload,
     pw.MemoryImage? logoImage,
+    bool showKeepUpArrow = false,
   }) async {
     final doc = pw.Document();
     doc.addPage(
@@ -23,15 +24,13 @@ class FrontendLabelEngine {
         ),
         build: (pw.Context context) {
           return pw.Container(
-            // NOTE: color property ko hata kar decoration ke andar rakha gaya hai
             decoration: const pw.BoxDecoration(
               color: PdfColors.white,
             ),
-            padding: const pw.EdgeInsets.symmetric(horizontal: 1.5, vertical: 1.0),
+            padding: const pw.EdgeInsets.symmetric(horizontal: 1.2, vertical: 0.8),
             child: pw.Row(
-              crossAxisAlignment: pw.CrossAxisAlignment.center,
+              crossAxisAlignment: pw.CrossAxisAlignment.stretch,
               children: [
-                // LEFT SIDE: Logo & QR Code
                 pw.SizedBox(
                   width: 44,
                   child: pw.Column(
@@ -40,47 +39,73 @@ class FrontendLabelEngine {
                     children: [
                       if (logoImage != null)
                         pw.Container(
-                          height: 14,
+                          height: 13,
                           alignment: pw.Alignment.center,
                           child: pw.Image(logoImage, fit: pw.BoxFit.contain),
                         )
                       else
                         pw.Container(
-                          height: 14,
+                          height: 13,
                           alignment: pw.Alignment.center,
                           child: pw.Text(
                             'SVENSKA',
-                            style: pw.TextStyle(fontSize: 6.5, fontWeight: pw.FontWeight.bold, color: PdfColors.black),
+                            style: pw.TextStyle(fontSize: 6.2, fontWeight: pw.FontWeight.bold, color: PdfColors.black),
                           ),
                         ),
                       pw.BarcodeWidget(
                         barcode: pw.Barcode.qrCode(errorCorrectLevel: pw.BarcodeQRCorrectionLevel.low),
                         data: qrPayload,
-                        width: 42,
-                        height: 42,
+                        width: showKeepUpArrow ? 40 : 42,
+                        height: showKeepUpArrow ? 40 : 42,
                         color: PdfColors.black,
                       ),
                     ],
                   ),
                 ),
-                pw.SizedBox(width: 4),
-
-                // RIGHT SIDE: Details List
+                pw.SizedBox(width: showKeepUpArrow ? 2 : 4),
                 pw.Expanded(
                   child: pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     mainAxisAlignment: pw.MainAxisAlignment.center,
                     children: [
-                      _buildSpecRow('Vehicle Model', model),
-                      pw.SizedBox(height: 1.5),
-                      _buildSpecRow('Customer Part No', customerPartNo),
-                      pw.SizedBox(height: 1.5),
-                      _buildSpecRow('Part No', partNo),
-                      pw.SizedBox(height: 1.5),
-                      _buildSpecRow('Date of MFG', mfgDate),
+                      _buildSpecRow('Vehicle Model', model, compact: showKeepUpArrow),
+                      pw.SizedBox(height: showKeepUpArrow ? 0.8 : 1.5),
+                      _buildSpecRow('Customer Part No', customerPartNo, compact: showKeepUpArrow),
+                      pw.SizedBox(height: showKeepUpArrow ? 0.8 : 1.5),
+                      _buildSpecRow('Part No', partNo, compact: showKeepUpArrow),
+                      pw.SizedBox(height: showKeepUpArrow ? 0.8 : 1.5),
+                      _buildSpecRow('Date of MFG', mfgDate, compact: showKeepUpArrow),
+                      if (showKeepUpArrow) ...[
+                        pw.SizedBox(height: 1.2),
+                        pw.Center(
+                          child: pw.Text(
+                            'KEEP UP RIGHT',
+                            style: pw.TextStyle(
+                              fontSize: 5.6,
+                              fontWeight: pw.FontWeight.bold,
+                              color: PdfColors.black,
+                            ),
+                          ),
+                        ),
+                        pw.Spacer(),
+                        pw.Center(
+                          child: pw.Text(
+                            'MADE IN INDIA',
+                            style: pw.TextStyle(
+                              fontSize: 4.6,
+                              fontWeight: pw.FontWeight.bold,
+                              color: PdfColors.black,
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
+                if (showKeepUpArrow) ...[
+                  pw.SizedBox(width: 2),
+                  _buildUpArrow(),
+                ],
               ],
             ),
           );
@@ -88,6 +113,31 @@ class FrontendLabelEngine {
       ),
     );
     return await doc.save();
+  }
+
+  static pw.Widget _buildUpArrow() {
+    return pw.SizedBox(
+      width: 10,
+      child: pw.CustomPaint(
+        size: const PdfPoint(10, 58),
+        painter: (PdfGraphics canvas, PdfPoint size) {
+          final w = size.x;
+          final h = size.y;
+          final headH = h * 0.28;
+          final shaftW = w * 0.36;
+          final shaftLeft = (w - shaftW) / 2;
+
+          canvas.setFillColor(PdfColors.black);
+          canvas.moveTo(w / 2, 0);
+          canvas.lineTo(w, headH);
+          canvas.lineTo(0, headH);
+          canvas.closePath();
+          canvas.fillPath();
+
+          canvas.drawRect(shaftLeft, headH, shaftW, h - headH);
+        },
+      ),
+    );
   }
 
   /// 100x50 mm Industrial Layout
@@ -110,7 +160,6 @@ class FrontendLabelEngine {
         ),
         build: (pw.Context context) {
           return pw.Container(
-            // NOTE: color property yahan se hata di gayi hai aur BoxDecoration ke andar color set hai
             decoration: pw.BoxDecoration(
               color: PdfColors.white,
               border: pw.Border.all(color: PdfColors.black, width: 1.0),
@@ -176,17 +225,20 @@ class FrontendLabelEngine {
     return await doc.save();
   }
 
-  static pw.Widget _buildSpecRow(String label, String val) {
+  static pw.Widget _buildSpecRow(String label, String val, {bool compact = false}) {
+    final labelWidth = compact ? 40.0 : 42.0;
+    final fontSize = compact ? 4.6 : 4.8;
+    final valueSize = compact ? 4.8 : 5.0;
     return pw.Row(
       crossAxisAlignment: pw.CrossAxisAlignment.center,
       children: [
         pw.SizedBox(
-          width: 48,
-          child: pw.Text(label, style: pw.TextStyle(fontSize: 4.8, fontWeight: pw.FontWeight.bold, color: PdfColors.black)),
+          width: labelWidth,
+          child: pw.Text(label, style: pw.TextStyle(fontSize: fontSize, fontWeight: pw.FontWeight.bold, color: PdfColors.black)),
         ),
-        pw.Text(': ', style: pw.TextStyle(fontSize: 4.8, fontWeight: pw.FontWeight.bold, color: PdfColors.black)),
+        pw.Text(': ', style: pw.TextStyle(fontSize: fontSize, fontWeight: pw.FontWeight.bold, color: PdfColors.black)),
         pw.Expanded(
-          child: pw.Text(val, maxLines: 1, style: pw.TextStyle(fontSize: 5.2, fontWeight: pw.FontWeight.bold, color: PdfColors.black)),
+          child: pw.Text(val, maxLines: 1, style: pw.TextStyle(fontSize: valueSize, fontWeight: pw.FontWeight.bold, color: PdfColors.black)),
         ),
       ],
     );

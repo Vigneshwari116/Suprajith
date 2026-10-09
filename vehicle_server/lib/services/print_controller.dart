@@ -29,11 +29,10 @@ class PrintController {
         return jsonRes({'status': 'error', 'message': 'vehicle_model required'}, statusCode: 400);
       }
 
-      // Server-side validation: fixed part is 19 or 20 characters (depends on the part)
-      if (fixedQr.length != 19 && fixedQr.length != 20) {
+      if (fixedQr.length != 20) {
         return jsonRes({
           'status': 'error',
-          'message': 'fixed_qr_code must be 19 or 20 characters (Received: ${fixedQr.length})'
+          'message': 'fixed_qr_code must be exactly 20 characters (Received: ${fixedQr.length})'
         }, statusCode: 400);
       }
 
@@ -64,8 +63,6 @@ class PrintController {
       final payload = await parseBody(req);
       final modelQuery = payload['model']?.toString().trim() ?? '';
       final labelSize = payload['label_size']?.toString().trim() ?? '50x25';
-      final dateStr = payload['date']?.toString().trim() ?? '';
-
       if (modelQuery.isEmpty) {
         return jsonRes({'status': 'error', 'message': 'Model query required'}, statusCode: 400);
       }
@@ -75,33 +72,35 @@ class PrintController {
         return jsonRes({'status': 'error', 'message': 'Model not found in database'}, statusCode: 404);
       }
 
-      // 1. Fixed QR Code check (19 or 20 characters)
+      // 1. Fixed QR Code check (exactly 20 characters)
       final fixedQr = master['fixed_qr_code']?.toString().trim() ?? '';
-      if (fixedQr.length != 19 && fixedQr.length != 20) {
+      if (fixedQr.length != 20) {
         return jsonRes({
           'status': 'error',
-          'message': 'Master fixed_qr_code must be 19 or 20 characters. Please update in Master Management.'
+          'message':
+              'Master fixed QR code must be exactly 20 characters (current: ${fixedQr.length}). Please update in Master Management.'
         }, statusCode: 400);
       }
 
-      DateTime activeDate = DateTime.now();
-      if (dateStr.isNotEmpty) {
-        try {
-          final parts = dateStr.split('.');
-          if (parts.length == 3) {
-            activeDate = DateTime(int.parse(parts[2]), int.parse(parts[1]), int.parse(parts[0]));
-          }
-        } catch (_) {}
-      }
+      // Always use system date at print time for QR date encoding.
+      final activeDate = DateTime.now();
 
-      // 2. Date code + Month code + 2-digit Year + Constant 'AA' -> e.g. 08.10.2026 = "8A26AA"
+      // 2. Date code + Month code + 2-digit Year + Constant 'AA' -> e.g. 09.10.2026 = "9A26AA"
       final dateShiftCode = AutomotiveDateEncoder.encode(activeDate);
 
-      // 3. Serial 4 Digits -> e.g. "0001"
-      final nextSerial = ServerDatabase.getNextSerialAndIncrement(master['vehicle_model'], dateShiftCode);
+      // 3. Serial 4 Digits -> e.g. "0001" (max 0999 per model per date code)
+      int nextSerial;
+      try {
+        nextSerial = ServerDatabase.getNextSerialAndIncrement(
+          master['vehicle_model']?.toString() ?? modelQuery,
+          dateShiftCode,
+        );
+      } on StateError catch (e) {
+        return jsonRes({'status': 'error', 'message': e.message}, statusCode: 400);
+      }
       final serialStr = nextSerial.toString().padLeft(4, '0');
 
-      // 4. Final QR Payload: fixed part (19/20) + date/month/year code + AA + 4-digit serial
+      // 4. Final QR Payload: 20-char fixed + date/month/year code + AA + 4-digit serial (30 total)
       final fullPayload = '$fixedQr$dateShiftCode$serialStr';
 
       final clientIp = req.headers['x-forwarded-for'] ??
@@ -113,7 +112,7 @@ class PrintController {
         model: master['vehicle_model'],
         custPart: master['customer_part_no'] ?? '',
         partNo: master['part_no'] ?? '',
-        mfgDate: master['date_of_mfg'] ?? dateStr,
+        mfgDate: master['date_of_mfg'] ?? '',
         serial: serialStr,
         qrPayload: fullPayload,
         clientIp: clientIp,
@@ -132,8 +131,10 @@ class PrintController {
         'model': master['vehicle_model'],
         'customer_part_no': master['customer_part_no'] ?? '',
         'part_no': master['part_no'] ?? '',
-        'mfg_date': master['date_of_mfg'] ?? dateStr,
+        'mfg_date': master['date_of_mfg'] ?? '',
         'company_logo': master['company_logo'] ?? 'none',
+        'show_keep_up_arrow': (master['show_keep_up_arrow'] == 1 ||
+            master['show_keep_up_arrow'] == true),
       });
     } catch (e) {
       return jsonRes({'status': 'error', 'message': e.toString()}, statusCode: 500);

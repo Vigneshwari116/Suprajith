@@ -15,6 +15,7 @@ import 'dual_printer_settings_modal.dart';
 import 'frontend_label_engine.dart';
 import 'logo_assets_resolver.dart';
 import 'master_management_modal.dart';
+import '../../../../core/constants/label_config.dart';
 
 // THEME & COLOR PALETTE
 const Color kAppBg = Color(0xFFF1F5F9);
@@ -41,7 +42,8 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
   final _fixedQrDisplayCtrl = TextEditingController();
   final FocusNode _scannerFocusNode = FocusNode();
 
-  DateTime _activePrintDate = DateTime.now();
+  DateTime _displayToday = DateTime.now();
+  Timer? _midnightRefreshTimer;
 
   VehicleMaster? _selectedMaster;
   Map<String, String>? _activeLabelData;
@@ -66,11 +68,31 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
     _loadMasterRecords();
     _fetchServerPrinterConfig();
     _startLiveHealthPolling();
+    _startTodayDateRefreshTimer();
+  }
+
+  void _startTodayDateRefreshTimer() {
+    _syncDisplayToday();
+    _midnightRefreshTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      _syncDisplayToday();
+    });
+  }
+
+  void _syncDisplayToday() {
+    final now = DateTime.now();
+    if (now.year != _displayToday.year ||
+        now.month != _displayToday.month ||
+        now.day != _displayToday.day) {
+      if (mounted) {
+        setState(() => _displayToday = now);
+      }
+    }
   }
 
   @override
   void dispose() {
     _healthCheckTimer?.cancel();
+    _midnightRefreshTimer?.cancel();
     _modelInputCtrl.dispose();
     _fixedQrDisplayCtrl.dispose();
     _scannerFocusNode.dispose();
@@ -140,23 +162,6 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
         });
       }
     } catch (_) {}
-  }
-
-  Future<void> _pickActivePrintDate() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _activePrintDate,
-      firstDate: DateTime(1990),
-      lastDate: DateTime(2100),
-      helpText: "SELECT PRINTING & QR CODE DATE",
-    );
-
-    if (picked != null) {
-      setState(() {
-        _activePrintDate = picked;
-      });
-      _scannerFocusNode.requestFocus();
-    }
   }
 
   void _onModelSelectedFromDropdown(String val) {
@@ -238,12 +243,11 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
       return;
     }
 
-    // FIXED QR CHECK BEFORE PRINTING (19 or 20 characters)
     final masterFixedQr = matched.fixedQrCode.trim();
-    if (masterFixedQr.length != 19 && masterFixedQr.length != 20) {
+    if (masterFixedQr.length != 20) {
       setState(() => _validationError =
-      "Fixed QR must be 19 or 20 characters! Current has ${masterFixedQr.length}. Edit in Master Entry.");
-      _showToast("Invalid Master QR length: Expected 19 or 20 characters", isError: true);
+      "Fixed QR must be exactly 20 characters! Current has ${masterFixedQr.length}. Edit in Master Entry.");
+      _showToast("Invalid Master QR length: Expected exactly 20 characters", isError: true);
       _scannerFocusNode.requestFocus();
       return;
     }
@@ -254,7 +258,8 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
       _fixedQrDisplayCtrl.text = masterFixedQr;
     });
 
-    final formattedDate = DateFormat('dd.MM.yyyy').format(_activePrintDate);
+    final printMoment = DateTime.now();
+    final formattedDate = DateFormat('dd.MM.yyyy').format(printMoment);
     final targetPrinter = _selectedLabelSize == '100x50'
         ? (_printer100x50 ?? 'TSC TTP-244 Plus')
         : (_printer50x25 ?? 'TSC TTP-244 Plus');
@@ -282,7 +287,7 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
             model: matched.vehicleModel,
             custPart: matched.customerPartNo,
             partNo: matched.partNo,
-            mfgDate: matched.dateOfMfg.isNotEmpty ? matched.dateOfMfg : formattedDate,
+            mfgDate: formattedDate,
             serial: serialStr,
             qrPayload: fullPayload,
             logoImage: logoImage,
@@ -292,9 +297,10 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
             model: matched.vehicleModel,
             customerPartNo: matched.customerPartNo,
             partNo: matched.partNo,
-            mfgDate: matched.dateOfMfg.isNotEmpty ? matched.dateOfMfg : formattedDate,
+            mfgDate: formattedDate,
             qrPayload: fullPayload,
             logoImage: logoImage,
+            showKeepUpArrow: matched.showKeepUpArrow,
           );
         }
 
@@ -308,11 +314,12 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
           'model': matched.vehicleModel,
           'customer_part_no': matched.customerPartNo,
           'part_no': matched.partNo,
-          'date_of_mfg': matched.dateOfMfg.isNotEmpty ? matched.dateOfMfg : formattedDate,
+          'date_of_mfg': formattedDate,
           'qr_data': fullPayload,
           'sn': serialStr,
           'size': _selectedLabelSize,
           'logo': matched.companyLogo,
+          'show_keep_up_arrow': matched.showKeepUpArrow ? '1' : '0',
         };
 
         if (mounted) {
@@ -462,7 +469,7 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
           color: kAccent,
         ),
         decoration: InputDecoration(
-          labelText: "Fixed QR Code (19/20 Digits)",
+          labelText: "Fixed QR Code (20 Digits)",
           labelStyle: const TextStyle(fontSize: 11, color: kTextSecondary),
           floatingLabelBehavior: FloatingLabelBehavior.always,
           hintText: "[Select Model to View QR]",
@@ -552,31 +559,36 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
     );
   }
 
-  Widget _buildDatePickerButton(String formattedDate) {
-    return InkWell(
-      onTap: _pickActivePrintDate,
-      borderRadius: BorderRadius.circular(4),
-      child: Container(
-        height: 44,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        decoration: BoxDecoration(
-          color: kLightTint,
-          border: Border.all(color: kBorder),
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.calendar_month_rounded, size: 18, color: kAccent),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                formattedDate,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: kTextPrimary),
-              ),
+  Widget _buildReadOnlyTodayDate(String formattedDate) {
+    return Container(
+      height: 44,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        color: kLightTint,
+        border: Border.all(color: kBorder),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.calendar_today_rounded, size: 18, color: kAccent),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Today's Date (QR & Label)",
+                  style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: kTextSecondary),
+                ),
+                Text(
+                  formattedDate,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: kTextPrimary),
+                ),
+              ],
             ),
-            const Icon(Icons.arrow_drop_down, size: 18, color: kTextSecondary),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -817,6 +829,19 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
   }
 
   Widget _buildSizeSelector() {
+    if (!kEnableLargeLabel) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: kAccent,
+          borderRadius: BorderRadius.circular(5),
+        ),
+        child: const Text(
+          'Small (50x25 mm)',
+          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+        ),
+      );
+    }
     return Container(
       decoration: BoxDecoration(
         color: kLightTint,
@@ -864,7 +889,7 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 700;
     final isTablet = screenWidth >= 700 && screenWidth < 1024;
-    final formattedActiveDate = DateFormat('dd.MM.yyyy').format(_activePrintDate);
+    final formattedActiveDate = DateFormat('dd.MM.yyyy').format(_displayToday);
     final activeTargetPrinter = _selectedLabelSize == '100x50' ? _printer100x50 : _printer50x25;
 
     return Scaffold(
@@ -1016,7 +1041,7 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
                   const SizedBox(height: 10),
                   Row(
                     children: [
-                      Expanded(flex: 5, child: _buildDatePickerButton(formattedActiveDate)),
+                      Expanded(flex: 5, child: _buildReadOnlyTodayDate(formattedActiveDate)),
                       const SizedBox(width: 8),
                       Expanded(flex: 5, child: _buildPrintButton()),
                     ],
@@ -1031,7 +1056,7 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
                       const SizedBox(width: 10),
                       SizedBox(
                         width: isTablet ? 130 : 160,
-                        child: _buildDatePickerButton(formattedActiveDate),
+                        child: _buildReadOnlyTodayDate(formattedActiveDate),
                       ),
                       const SizedBox(width: 10),
                       SizedBox(

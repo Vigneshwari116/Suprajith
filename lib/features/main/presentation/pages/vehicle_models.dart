@@ -6,6 +6,7 @@ class VehicleMaster {
   final String dateOfMfg;
   final String fixedQrCode;
   final String companyLogo;
+  final bool showKeepUpArrow;
 
   VehicleMaster({
     this.id,
@@ -15,6 +16,7 @@ class VehicleMaster {
     required this.dateOfMfg,
     required this.fixedQrCode,
     this.companyLogo = 'none',
+    this.showKeepUpArrow = false,
   });
 
   Map<String, dynamic> toMap() {
@@ -26,10 +28,13 @@ class VehicleMaster {
       'date_of_mfg': dateOfMfg,
       'fixed_qr_code': fixedQrCode,
       'company_logo': companyLogo,
+      'show_keep_up_arrow': showKeepUpArrow,
     };
   }
 
   factory VehicleMaster.fromMap(Map<String, dynamic> map) {
+    final arrowRaw = map['show_keep_up_arrow'];
+    final showArrow = arrowRaw == true || arrowRaw == 1 || arrowRaw?.toString() == '1';
     return VehicleMaster(
       id: map['id'] is int ? map['id'] : int.tryParse(map['id']?.toString() ?? ''),
       vehicleModel: map['vehicle_model']?.toString() ?? '',
@@ -38,6 +43,7 @@ class VehicleMaster {
       dateOfMfg: map['date_of_mfg']?.toString() ?? '',
       fixedQrCode: map['fixed_qr_code']?.toString() ?? '',
       companyLogo: map['company_logo']?.toString() ?? 'none',
+      showKeepUpArrow: showArrow,
     );
   }
 }

@@ -32,6 +32,7 @@ class _MasterManagementModalState extends State<MasterManagementModal> {
   String? _qrValidationError;
 
   String _selectedLogoKey = 'suprajit';
+  bool _showKeepUpArrow = false;
 
   final List<Map<String, String>> _availableLogos = [
     {'key': 'suprajit', 'label': 'Suprajit'},
@@ -40,6 +41,21 @@ class _MasterManagementModalState extends State<MasterManagementModal> {
     {'key': 'sansera', 'label': 'Sansera'},
     {'key': 'none', 'label': 'No Logo / Text Only'},
   ];
+
+  /// Logos shown in the dropdown (other assets remain available for existing records).
+  static const List<Map<String, String>> visibleLogos = [
+    {'key': 'suprajit', 'label': 'Suprajit'},
+  ];
+
+  List<Map<String, String>> _logoDropdownItems() {
+    final visibleKeys = visibleLogos.map((e) => e['key']).toSet();
+    if (visibleKeys.contains(_selectedLogoKey)) return visibleLogos;
+    final existing = _availableLogos.firstWhere(
+      (e) => e['key'] == _selectedLogoKey,
+      orElse: () => {'key': _selectedLogoKey, 'label': _selectedLogoKey},
+    );
+    return [...visibleLogos, existing];
+  }
 
   @override
   void initState() {
@@ -88,7 +104,8 @@ class _MasterManagementModalState extends State<MasterManagementModal> {
           ? item.dateOfMfg
           : DateFormat('dd.MM.yyyy').format(DateTime.now());
       _fixedQrCtrl.text = item.fixedQrCode;
-      _selectedLogoKey = item.companyLogo.isNotEmpty ? item.companyLogo : 'none';
+      _selectedLogoKey = item.companyLogo.isNotEmpty ? item.companyLogo : 'suprajit';
+      _showKeepUpArrow = item.showKeepUpArrow;
       _qrValidationError = null;
     });
     _showToast("Loaded: ${item.vehicleModel} into form");
@@ -121,13 +138,12 @@ class _MasterManagementModalState extends State<MasterManagementModal> {
       return;
     }
 
-    // FIXED QR VALIDATION: 19 or 20 characters
-    if (fixedQr.length != 19 && fixedQr.length != 20) {
+    if (fixedQr.length != 20) {
       setState(() {
-        _qrValidationError = "Fixed QR must be 19 or 20 characters (Current: ${fixedQr.length})";
+        _qrValidationError = "Fixed QR must be exactly 20 characters (current: ${fixedQr.length})";
       });
       _fnQr.requestFocus();
-      _showToast("Validation Failed: Fixed QR must be 19 or 20 characters!", isError: true);
+      _showToast("Validation Failed: Fixed QR must be exactly 20 characters!", isError: true);
       return;
     }
 
@@ -143,6 +159,7 @@ class _MasterManagementModalState extends State<MasterManagementModal> {
           'date_of_mfg': _mfgDateCtrl.text.trim(),
           'fixed_qr_code': fixedQr,
           'company_logo': _selectedLogoKey,
+          'show_keep_up_arrow': _showKeepUpArrow,
         },
       );
 
@@ -155,6 +172,7 @@ class _MasterManagementModalState extends State<MasterManagementModal> {
         _fixedQrCtrl.clear();
         setState(() {
           _selectedLogoKey = 'suprajit';
+          _showKeepUpArrow = false;
           _qrValidationError = null;
         });
         _fnModel.requestFocus();
@@ -295,6 +313,8 @@ class _MasterManagementModalState extends State<MasterManagementModal> {
                     _custPartCtrl.clear();
                     _partCtrl.clear();
                     _fixedQrCtrl.clear();
+                    _mfgDateCtrl.text = DateFormat('dd.MM.yyyy').format(DateTime.now());
+                    _showKeepUpArrow = false;
                     _qrValidationError = null;
                   });
                 },
@@ -332,14 +352,14 @@ class _MasterManagementModalState extends State<MasterManagementModal> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text("5. Fixed QR Code (19 or 20 Characters) *",
+            const Text("5. Fixed QR Code (20 Characters) *",
                 style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black)),
             Text(
               "${_fixedQrCtrl.text.length}/20",
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.bold,
-                color: (_fixedQrCtrl.text.length == 19 || _fixedQrCtrl.text.length == 20) ? Colors.green : Colors.red,
+                color: _fixedQrCtrl.text.length == 20 ? Colors.green : Colors.red,
               ),
             ),
           ],
@@ -357,8 +377,8 @@ class _MasterManagementModalState extends State<MasterManagementModal> {
             ],
             onChanged: (val) {
               setState(() {
-                if (val.length != 19 && val.length != 20) {
-                  _qrValidationError = "Must be 19 or 20 characters";
+                if (val.length != 20) {
+                  _qrValidationError = "Must be exactly 20 characters";
                 } else {
                   _qrValidationError = null;
                 }
@@ -367,7 +387,7 @@ class _MasterManagementModalState extends State<MasterManagementModal> {
             onSubmitted: (_) => _saveMaster(),
             decoration: InputDecoration(
               counterText: "",
-              hintText: "Enter 19 or 20 character fixed QR code",
+              hintText: "Enter 20-character fixed QR code",
               hintStyle: const TextStyle(fontSize: 11, color: Color(0xFF475569)),
               prefixIcon: const Icon(Icons.qr_code_2, size: 16),
               border: const OutlineInputBorder(),
@@ -395,7 +415,7 @@ class _MasterManagementModalState extends State<MasterManagementModal> {
               border: OutlineInputBorder(),
               contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 0),
             ),
-            items: _availableLogos.map((item) {
+            items: _logoDropdownItems().map((item) {
               return DropdownMenuItem<String>(
                 value: item['key'],
                 child: Text(item['label']!, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
@@ -406,7 +426,19 @@ class _MasterManagementModalState extends State<MasterManagementModal> {
             },
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 10),
+        CheckboxListTile(
+          contentPadding: EdgeInsets.zero,
+          dense: true,
+          controlAffinity: ListTileControlAffinity.leading,
+          title: const Text(
+            "Arrow + Keep Up Right + Made in India",
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black),
+          ),
+          value: _showKeepUpArrow,
+          onChanged: (val) => setState(() => _showKeepUpArrow = val ?? false),
+        ),
+        const SizedBox(height: 10),
         SizedBox(
           width: double.infinity,
           height: 38,
@@ -505,7 +537,7 @@ class _MasterManagementModalState extends State<MasterManagementModal> {
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0.5),
                                   decoration: BoxDecoration(
-                                    color: (item.fixedQrCode.length == 19 || item.fixedQrCode.length == 20) ? Colors.green.shade50 : Colors.red.shade50,
+                                    color: item.fixedQrCode.length == 20 ? Colors.green.shade50 : Colors.red.shade50,
                                     borderRadius: BorderRadius.circular(2),
                                   ),
                                   child: Text(
@@ -513,7 +545,7 @@ class _MasterManagementModalState extends State<MasterManagementModal> {
                                     style: TextStyle(
                                       fontSize: 8.5,
                                       fontWeight: FontWeight.bold,
-                                      color: (item.fixedQrCode.length == 19 || item.fixedQrCode.length == 20) ? Colors.green.shade800 : Colors.red.shade800,
+                                      color: item.fixedQrCode.length == 20 ? Colors.green.shade800 : Colors.red.shade800,
                                     ),
                                   ),
                                 ),
