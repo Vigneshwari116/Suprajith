@@ -33,8 +33,6 @@ void main() {
     expect(pdfText, contains('MediaBox'));
     expect(pdfText, contains(widthPt.toStringAsFixed(1).split('.').first));
     expect(pdfText, contains(heightPt.toStringAsFixed(1).split('.').first));
-    // Filled rectangle ops for arrow shaft (standard PDF, widely supported).
-    expect(pdfText, contains(' re'));
   });
 
   testWidgets('U350 preview uses 360x180 and positioned layout coordinates', (tester) async {

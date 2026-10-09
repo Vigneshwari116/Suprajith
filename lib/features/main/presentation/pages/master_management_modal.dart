@@ -1,8 +1,11 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:svenska/features/main/presentation/pages/vehicle_models.dart';
+import '../../../../core/constants/app_mode.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/services/local_label_service.dart';
 import '../../../../injection.dart';
 
 class MasterManagementModal extends StatefulWidget {
@@ -81,16 +84,35 @@ class _MasterManagementModalState extends State<MasterManagementModal> {
   Future<void> _loadItems() async {
     setState(() => _isLoading = true);
     try {
-      final res = await sl<ApiClient>().get('/api/masters');
-      if (res.statusCode == 200 && res.data['status'] == 'success') {
-        final List raw = res.data['data'] ?? [];
-        if (mounted) {
-          setState(() => _items = raw.map((e) => VehicleMaster.fromMap(e)).toList());
-          widget.onMasterUpdated();
-        }
+      final List raw = kUseLocalDataStore
+          ? sl<LocalLabelService>().listMasters()
+          : (await sl<ApiClient>().get('/api/masters')).data['data'] as List? ?? [];
+      if (mounted) {
+        setState(() => _items = raw.map((e) => VehicleMaster.fromMap(e as Map<String, dynamic>)).toList());
+        widget.onMasterUpdated();
       }
     } catch (_) {} finally {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _importFromLegacyServerDatabase() async {
+    final picked = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['db'],
+      dialogTitle: 'Select old svenska_vehicle.db',
+    );
+    final path = picked?.files.single.path;
+    if (path == null) return;
+
+    try {
+      final result = sl<LocalLabelService>().importMastersFromLegacyDb(path);
+      await _loadItems();
+      _showToast(
+        'Import complete: ${result.imported} added, ${result.skipped} skipped (already exist)',
+      );
+    } catch (e) {
+      _showToast('Import failed: $e', isError: true);
     }
   }
 
@@ -148,44 +170,56 @@ class _MasterManagementModalState extends State<MasterManagementModal> {
     setState(() => _qrValidationError = null);
 
     try {
-      final res = await sl<ApiClient>().post(
-        '/api/masters',
-        data: {
-          'vehicle_model': model,
-          'customer_part_no': _custPartCtrl.text.trim(),
-          'part_no': _partCtrl.text.trim(),
-          'date_of_mfg': _mfgDateCtrl.text.trim(),
-          'fixed_qr_code': fixedQr,
-          'company_logo': _selectedLogoKey,
-        },
-      );
+      final payload = {
+        'vehicle_model': model,
+        'customer_part_no': _custPartCtrl.text.trim(),
+        'part_no': _partCtrl.text.trim(),
+        'date_of_mfg': _mfgDateCtrl.text.trim(),
+        'fixed_qr_code': fixedQr,
+        'company_logo': _selectedLogoKey,
+      };
 
-      if (res.statusCode == 200) {
-        await _loadItems();
-        _modelCtrl.clear();
-        _custPartCtrl.clear();
-        _partCtrl.clear();
-        _mfgDateCtrl.text = DateFormat('dd.MM.yyyy').format(DateTime.now());
-        _fixedQrCtrl.clear();
-        setState(() {
-          _selectedLogoKey = 'suprajit';
-          _qrValidationError = null;
-        });
-        _fnModel.requestFocus();
-        _showToast("Master entry saved on Server!");
+      if (kUseLocalDataStore) {
+        final res = sl<LocalLabelService>().saveMaster(payload);
+        if (res['status'] != 'success') {
+          _showToast(res['message']?.toString() ?? 'Save failed', isError: true);
+          return;
+        }
+      } else {
+        final res = await sl<ApiClient>().post('/api/masters', data: payload);
+        if (res.statusCode != 200) {
+          _showToast("Failed to save master", isError: true);
+          return;
+        }
       }
+
+      await _loadItems();
+      _modelCtrl.clear();
+      _custPartCtrl.clear();
+      _partCtrl.clear();
+      _mfgDateCtrl.text = DateFormat('dd.MM.yyyy').format(DateTime.now());
+      _fixedQrCtrl.clear();
+      setState(() {
+        _selectedLogoKey = 'suprajit';
+        _qrValidationError = null;
+      });
+      _fnModel.requestFocus();
+      _showToast("Master entry saved!");
     } catch (e) {
-      _showToast("Failed to save master on server: $e", isError: true);
+      _showToast("Failed to save master: $e", isError: true);
     }
   }
 
   Future<void> _deleteMaster(int id) async {
     try {
-      final res = await sl<ApiClient>().delete('/api/masters/$id');
-      if (res.statusCode == 200) {
-        await _loadItems();
-        _showToast("Entry removed from server");
+      if (kUseLocalDataStore) {
+        sl<LocalLabelService>().deleteMaster(id);
+      } else {
+        final res = await sl<ApiClient>().delete('/api/masters/$id');
+        if (res.statusCode != 200) return;
       }
+      await _loadItems();
+      _showToast("Entry removed");
     } catch (e) {
       _showToast("Delete failed: $e", isError: true);
     }
@@ -193,13 +227,13 @@ class _MasterManagementModalState extends State<MasterManagementModal> {
 
   Future<void> _resetSerial(String model) async {
     try {
-      final res = await sl<ApiClient>().post(
-        '/api/serial/reset',
-        data: {'model': model},
-      );
-      if (res.statusCode == 200) {
-        _showToast("Serial reset to 0001 on server!");
+      if (kUseLocalDataStore) {
+        sl<LocalLabelService>().resetSerial(model);
+      } else {
+        final res = await sl<ApiClient>().post('/api/serial/reset', data: {'model': model});
+        if (res.statusCode != 200) return;
       }
+      _showToast("Serial reset to 0001!");
     } catch (e) {
       _showToast("Reset failed: $e", isError: true);
     }
@@ -241,6 +275,12 @@ class _MasterManagementModalState extends State<MasterManagementModal> {
                   const Text("VEHICLE MASTER ENTRY",
                       style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black)),
                   const Spacer(),
+                  if (kUseLocalDataStore)
+                    TextButton.icon(
+                      onPressed: _isLoading ? null : _importFromLegacyServerDatabase,
+                      icon: const Icon(Icons.upload_file, size: 16),
+                      label: const Text('Import from old server database', style: TextStyle(fontSize: 11)),
+                    ),
                   IconButton(icon: const Icon(Icons.close, size: 18), onPressed: () => Navigator.of(context).pop()),
                 ],
               ),

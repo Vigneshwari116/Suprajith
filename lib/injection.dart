@@ -5,6 +5,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:svenska/features/main/injection_main.dart';
 import 'core/network/api_client.dart';
 import 'core/network/network_info.dart';
+import 'core/constants/app_mode.dart';
+import 'core/services/local_label_service.dart';
 import 'core/services/server_config_storage.dart';
 
 final sl = GetIt.instance;
@@ -33,6 +35,10 @@ Future<void> init() async {
   sl.registerLazySingleton<ServerConfigStorage>(
         () => ServerConfigStorage(sl<FlutterSecureStorage>()),
   );
+
+  if (kUseLocalDataStore) {
+    sl.registerLazySingleton<LocalLabelService>(() => LocalLabelService());
+  }
 
   // Features
   await initMainInjection(sl);
