@@ -1,7 +1,13 @@
+import 'dart:io' show Platform;
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:svenska/core/constants/app_mode.dart';
 import 'package:svenska/core/services/auth_service.dart';
+import 'package:svenska/core/services/local_label_service.dart';
+import 'package:svenska/core/services/printer_config_refresh_notifier.dart';
+import 'package:svenska/features/main/presentation/pages/dual_printer_settings_modal.dart';
 import 'package:svenska/injection.dart';
 import '../../../../core/utils/routes_name.dart';
 
@@ -15,7 +21,14 @@ class WorkstationShell extends StatefulWidget {
 }
 
 class _WorkstationShellState extends State<WorkstationShell> {
-  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  bool _navOpen = false;
+
+  static const _navWidth = 200.0;
+
+  bool get _showPrinterSettings {
+    if (kIsWeb) return false;
+    return Platform.isWindows || Platform.isMacOS || Platform.isLinux;
+  }
 
   int _selectedIndex(String location) {
     if (location.startsWith(AppRoutes.workstationMasters)) return 1;
@@ -39,7 +52,26 @@ class _WorkstationShellState extends State<WorkstationShell> {
 
   void _navigate(BuildContext context, String route) {
     context.go(route);
-    _scaffoldKey.currentState?.closeDrawer();
+  }
+
+  void _openPrinterSettings() {
+    String? printer50;
+    if (kUseLocalDataStore) {
+      final cfg = sl<LocalLabelService>().getPrinterConfig();
+      printer50 = cfg['printer_50x25']?.toString();
+    }
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => DualPrinterSettingsModal(
+        currentPrinter50: printer50,
+        onPrinterConfigured: () {
+          if (kUseLocalDataStore) {
+            sl<PrinterConfigRefreshNotifier>().notifyUpdated();
+          }
+        },
+      ),
+    );
   }
 
   Future<void> _confirmLogout(BuildContext context) async {
@@ -58,32 +90,41 @@ class _WorkstationShellState extends State<WorkstationShell> {
     if (kUseLocalDataStore) {
       sl<AuthService>().logout();
     }
-    _scaffoldKey.currentState?.closeDrawer();
     context.go(AppRoutes.login);
   }
 
-  Widget _drawerNav(BuildContext context, int selected) {
-    return Drawer(
-      child: SafeArea(
+  Widget _sideNavPanel(BuildContext context, int selected) {
+    return Material(
+      color: Colors.white,
+      elevation: 1,
+      child: SizedBox(
+        width: _navWidth,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 16, 16, 12),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 16, 14, 12),
               child: Row(
                 children: [
-                  Icon(Icons.qr_code_2_rounded, color: Color(0xFF0F172A), size: 22),
-                  SizedBox(width: 8),
-                  Expanded(
+                  const Icon(Icons.qr_code_2_rounded, color: Color(0xFF0F172A), size: 22),
+                  const SizedBox(width: 8),
+                  const Expanded(
                     child: Text(
                       'SVENSKA AUTOMOTIVE',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.indigoAccent),
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.indigoAccent),
                     ),
+                  ),
+                  IconButton(
+                    tooltip: 'Close menu',
+                    icon: const Icon(Icons.chevron_left, size: 20),
+                    onPressed: () => setState(() => _navOpen = false),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                   ),
                 ],
               ),
             ),
-            const Divider(height: 1),
+            const Divider(height: 1, color: Color(0xFFCBD5E1)),
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
@@ -112,11 +153,18 @@ class _WorkstationShellState extends State<WorkstationShell> {
                     selected: selected == 3,
                     onTap: () => _navigate(context, AppRoutes.workstationBackup),
                   ),
+                  if (_showPrinterSettings)
+                    _SideNavItem(
+                      label: 'Printer settings',
+                      icon: Icons.settings_outlined,
+                      selected: false,
+                      onTap: _openPrinterSettings,
+                    ),
                 ],
               ),
             ),
             if (kUseLocalDataStore) ...[
-              const Divider(height: 1),
+              const Divider(height: 1, color: Color(0xFFCBD5E1)),
               Padding(
                 padding: const EdgeInsets.all(8),
                 child: _SideNavItem(
@@ -139,42 +187,51 @@ class _WorkstationShellState extends State<WorkstationShell> {
     final selected = _selectedIndex(location);
 
     return Scaffold(
-      key: _scaffoldKey,
       backgroundColor: const Color(0xFFF1F5F9),
-      drawer: _drawerNav(context, selected),
-      body: Column(
+      body: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Material(
-            color: Colors.white,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: const BoxDecoration(
-                border: Border(bottom: BorderSide(color: Color(0xFFCBD5E1))),
-              ),
-              child: Row(
-                children: [
-                  IconButton(
-                    tooltip: 'Open menu',
-                    icon: const Icon(Icons.menu, size: 22),
-                    color: const Color(0xFF2563EB),
-                    onPressed: () => _scaffoldKey.currentState?.openDrawer(),
-                  ),
-                  Expanded(
-                    child: Text(
-                      _pageTitle(selected),
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF0F172A),
-                      ),
+          if (_navOpen) ...[
+            _sideNavPanel(context, selected),
+            const VerticalDivider(width: 1, color: Color(0xFFCBD5E1)),
+          ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Material(
+                  color: Colors.white,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    decoration: const BoxDecoration(
+                      border: Border(bottom: BorderSide(color: Color(0xFFCBD5E1))),
+                    ),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          tooltip: _navOpen ? 'Close menu' : 'Open menu',
+                          icon: Icon(_navOpen ? Icons.menu_open : Icons.menu, size: 22),
+                          color: const Color(0xFF2563EB),
+                          onPressed: () => setState(() => _navOpen = !_navOpen),
+                        ),
+                        Expanded(
+                          child: Text(
+                            _pageTitle(selected),
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF0F172A),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
+                ),
+                Expanded(child: widget.child),
+              ],
             ),
           ),
-          Expanded(child: widget.child),
         ],
       ),
     );
