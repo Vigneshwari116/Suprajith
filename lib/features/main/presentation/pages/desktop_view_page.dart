@@ -17,6 +17,7 @@ import 'frontend_label_engine.dart';
 import 'logo_assets_resolver.dart';
 import 'master_management_modal.dart';
 import '../../../../core/constants/label_config.dart';
+import 'today_prints_panel.dart';
 import 'u350_label_preview.dart';
 
 // THEME & COLOR PALETTE
@@ -889,30 +890,7 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
                 color: (_printer50x25 != null && _printer100x50 != null) ? kAccent : Colors.orange,
               ),
             ),
-          if (!isMobile) ...[
-            const SizedBox(width: 4),
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: kCardBg,
-                foregroundColor: kPrimary,
-                elevation: 0,
-                side: const BorderSide(color: kBorder, width: 1.2),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-              ),
-              onPressed: _openMasterModal,
-              icon: const Icon(Icons.shield_outlined, size: 16),
-              label: Text("MASTERS (${_masterList.length})", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
-            ),
-            const SizedBox(width: 16),
-          ] else ...[
-            IconButton(
-              tooltip: "Manage Masters",
-              onPressed: _openMasterModal,
-              icon: const Icon(Icons.shield_outlined, color: kPrimary),
-            ),
-            const SizedBox(width: 8),
-          ],
+          const SizedBox(width: 8),
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
@@ -1042,24 +1020,27 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
             child: SingleChildScrollView(
               padding: EdgeInsets.all(isMobile ? 12 : 24),
               child: Center(
-                child: _activeLabelData == null
-                    ? Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                child: Column(
                   children: [
-                    const SizedBox(height: 60),
-                    Icon(Icons.print_outlined, size: isMobile ? 48 : 64, color: kTextSecondary.withOpacity(0.3)),
-                    const SizedBox(height: 12),
-                    const Text("Ready for Scanning",
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: kTextPrimary)),
-                    const SizedBox(height: 4),
-                    Text(
-                      "Scan or select Model and press ENTER to print directly to $_selectedLabelSize hardware.",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: kTextSecondary, fontSize: isMobile ? 12 : 13),
-                    ),
-                  ],
-                )
-                    : Column(
+                    if (_activeLabelData == null)
+                      Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const SizedBox(height: 60),
+                          Icon(Icons.print_outlined, size: isMobile ? 48 : 64, color: kTextSecondary.withOpacity(0.3)),
+                          const SizedBox(height: 12),
+                          const Text("Ready for Scanning",
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: kTextPrimary)),
+                          const SizedBox(height: 4),
+                          Text(
+                            "Scan or select Model and press ENTER to print directly to $_selectedLabelSize hardware.",
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: kTextSecondary, fontSize: isMobile ? 12 : 13),
+                          ),
+                        ],
+                      )
+                    else
+                      Column(
                   children: [
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -1102,6 +1083,10 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
                               ),
                       ),
                     ),
+                  ],
+                ),
+                    const SizedBox(height: 20),
+                    const TodayPrintsPanel(),
                   ],
                 ),
               ),

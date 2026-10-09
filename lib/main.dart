@@ -4,6 +4,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:svenska/core/constants/app_mode.dart';
 import 'package:svenska/core/database/local_vehicle_database.dart';
 import 'app.dart';
+import 'core/utils/app_restart.dart';
 import 'injection.dart' as di;
 
 Future<void> main() async {
@@ -18,9 +19,9 @@ Future<void> main() async {
 
     await di.init();
 
-    runApp(const MyApp());
+    runApp(const AppRestart(child: MyApp()));
   } catch (e) {
     debugPrint("INIT ERROR: $e");
-    runApp(const MyApp());
+    runApp(const AppRestart(child: MyApp()));
   }
 }

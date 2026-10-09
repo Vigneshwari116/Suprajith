@@ -1,13 +1,14 @@
 import 'dart:io';
 
-import 'package:intl/intl.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqlite3/sqlite3.dart';
+import 'package:svenska/core/utils/print_timestamp_formatter.dart';
 
 /// Local SQLite store (same schema as vehicle_server). Path:
 /// `%LOCALAPPDATA%\\SvenskaLabels\\svenska_vehicle.db`
 class LocalVehicleDatabase {
   static Database? _db;
+  static String? _databasePath;
 
   static Database get db {
     final instance = _db;
@@ -23,10 +24,13 @@ class LocalVehicleDatabase {
     return p.join(dirPath, 'svenska_vehicle.db');
   }
 
+  static String get databaseFilePath => _databasePath ?? defaultDatabasePath();
+
   static void init({String? databasePath}) {
     if (_db != null) return;
 
-    final dbPath = databasePath ?? defaultDatabasePath();
+    final dbPath = databasePath ?? _databasePath ?? defaultDatabasePath();
+    _databasePath = dbPath;
     final dir = Directory(p.dirname(dbPath));
     if (!dir.existsSync()) {
       dir.createSync(recursive: true);
@@ -39,6 +43,29 @@ class LocalVehicleDatabase {
   static void dispose() {
     _db?.dispose();
     _db = null;
+  }
+
+  static const _requiredTables = [
+    'vehicle_master',
+    'serial_tracker',
+    'print_history',
+    'app_config',
+  ];
+
+  static bool validateExternalDatabase(String filePath) {
+    final external = sqlite3.open(filePath);
+    try {
+      for (final table in _requiredTables) {
+        final res = external.select(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+          [table],
+        );
+        if (res.isEmpty) return false;
+      }
+      return true;
+    } finally {
+      external.dispose();
+    }
   }
 
   static void _createSchema() {
@@ -247,7 +274,7 @@ class LocalVehicleDatabase {
       mfgDate,
       serial,
       qrPayload,
-      DateFormat('dd.MM.yyyy HH:mm:ss').format(DateTime.now()),
+      PrintTimestampFormatter.formatForStorage(DateTime.now()),
       clientIp,
       companyLogo,
     ]);
@@ -255,8 +282,58 @@ class LocalVehicleDatabase {
   }
 
   static List<Map<String, dynamic>> getAuditLogs({int limit = 200}) {
-    final res = db.select('SELECT * FROM print_history ORDER BY id DESC LIMIT ?', [limit]);
-    return res.map((row) => Map<String, dynamic>.from(row)).toList();
+    return queryPrintHistory(limit: limit);
+  }
+
+  static List<Map<String, dynamic>> queryPrintHistory({
+    int limit = 5000,
+    DateTime? fromLocalDate,
+    DateTime? toLocalDate,
+    String? vehicleModel,
+    String? qrContains,
+    bool todayOnly = false,
+    DateTime? todayReference,
+  }) {
+    final clauses = <String>[];
+    final args = <Object>[];
+
+    if (vehicleModel != null && vehicleModel.trim().isNotEmpty) {
+      clauses.add('LOWER(vehicle_model) = LOWER(?)');
+      args.add(vehicleModel.trim());
+    }
+    if (qrContains != null && qrContains.trim().isNotEmpty) {
+      clauses.add('full_qr_data LIKE ?');
+      args.add('%${qrContains.trim()}%');
+    }
+
+    final where = clauses.isEmpty ? '' : 'WHERE ${clauses.join(' AND ')}';
+    final sql = 'SELECT * FROM print_history $where ORDER BY id DESC LIMIT ?';
+    args.add(limit);
+
+    final res = db.select(sql, args);
+    var rows = res.map((row) => Map<String, dynamic>.from(row)).toList();
+
+    if (fromLocalDate != null || toLocalDate != null || todayOnly) {
+      final ref = todayReference ?? DateTime.now();
+      rows = rows.where((row) {
+        final parsed = PrintTimestampFormatter.tryParsePrintedAt(row['printed_at']?.toString());
+        if (parsed == null) return !todayOnly;
+        if (todayOnly && !PrintTimestampFormatter.isSameLocalDay(parsed, ref)) {
+          return false;
+        }
+        if (fromLocalDate != null) {
+          final start = DateTime(fromLocalDate.year, fromLocalDate.month, fromLocalDate.day);
+          if (parsed.isBefore(start)) return false;
+        }
+        if (toLocalDate != null) {
+          final end = DateTime(toLocalDate.year, toLocalDate.month, toLocalDate.day, 23, 59, 59, 999);
+          if (parsed.isAfter(end)) return false;
+        }
+        return true;
+      }).toList();
+    }
+
+    return rows;
   }
 
   static String? getConfig(String key) {

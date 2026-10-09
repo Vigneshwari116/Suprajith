@@ -7,6 +7,7 @@ import 'core/network/api_client.dart';
 import 'core/network/network_info.dart';
 import 'core/constants/app_mode.dart';
 import 'core/services/local_label_service.dart';
+import 'core/services/print_history_refresh_notifier.dart';
 import 'core/services/server_config_storage.dart';
 
 final sl = GetIt.instance;
@@ -37,7 +38,10 @@ Future<void> init() async {
   );
 
   if (kUseLocalDataStore) {
-    sl.registerLazySingleton<LocalLabelService>(() => LocalLabelService());
+    sl.registerLazySingleton<PrintHistoryRefreshNotifier>(() => PrintHistoryRefreshNotifier());
+    sl.registerLazySingleton<LocalLabelService>(
+      () => LocalLabelService(sl<PrintHistoryRefreshNotifier>()),
+    );
   }
 
   // Features

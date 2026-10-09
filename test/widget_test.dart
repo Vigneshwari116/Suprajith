@@ -19,6 +19,6 @@ void main() {
   });
 
   test('local label service is registered after init', () {
-    expect(di.sl<LocalLabelService>(), isNotNull);
+    expect(di.sl<LocalLabelService>(), isA<LocalLabelService>());
   });
 }

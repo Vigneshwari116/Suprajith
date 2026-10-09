@@ -31,7 +31,7 @@ class _SplashPageState extends State<SplashPage> {
     if (kUseLocalDataStore) {
       await Future<void>.delayed(const Duration(milliseconds: 400));
       if (!mounted) return;
-      context.go(AppRoutes.desktopViewPage);
+      context.go(AppRoutes.workstationMain);
       return;
     }
 
@@ -56,9 +56,9 @@ class _SplashPageState extends State<SplashPage> {
 
     final bool isDesktop = !kIsWeb && (Platform.isWindows || Platform.isMacOS || Platform.isLinux);
     if (kIsWeb || isDesktop) {
-      context.go(AppRoutes.desktopViewPage);
+      context.go(AppRoutes.workstationMain);
     } else {
-      context.go(AppRoutes.desktopViewPage);
+      context.go(AppRoutes.workstationMain);
     }
   }
 

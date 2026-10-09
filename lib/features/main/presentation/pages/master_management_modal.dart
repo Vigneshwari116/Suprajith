@@ -10,7 +10,13 @@ import '../../../../injection.dart';
 
 class MasterManagementModal extends StatefulWidget {
   final VoidCallback onMasterUpdated;
-  const MasterManagementModal({super.key, required this.onMasterUpdated});
+  final bool fullPage;
+
+  const MasterManagementModal({
+    super.key,
+    required this.onMasterUpdated,
+    this.fullPage = false,
+  });
 
   @override
   State<MasterManagementModal> createState() => _MasterManagementModalState();
@@ -256,12 +262,9 @@ class _MasterManagementModalState extends State<MasterManagementModal> {
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 768;
 
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-      child: Container(
-        width: isMobile ? double.infinity : 890,
-        height: 640,
+    final panel = Container(
+        width: widget.fullPage ? double.infinity : (isMobile ? double.infinity : 890),
+        height: widget.fullPage ? double.infinity : 640,
         color: Colors.white,
         child: Column(
           children: [
@@ -281,7 +284,8 @@ class _MasterManagementModalState extends State<MasterManagementModal> {
                       icon: const Icon(Icons.upload_file, size: 16),
                       label: const Text('Import from old server database', style: TextStyle(fontSize: 11)),
                     ),
-                  IconButton(icon: const Icon(Icons.close, size: 18), onPressed: () => Navigator.of(context).pop()),
+                  if (!widget.fullPage)
+                    IconButton(icon: const Icon(Icons.close, size: 18), onPressed: () => Navigator.of(context).pop()),
                 ],
               ),
             ),
@@ -329,7 +333,16 @@ class _MasterManagementModalState extends State<MasterManagementModal> {
             ),
           ],
         ),
-      ),
+    );
+
+    if (widget.fullPage) {
+      return panel;
+    }
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      child: panel,
     );
   }
 

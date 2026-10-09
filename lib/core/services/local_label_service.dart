@@ -1,7 +1,11 @@
 import 'package:svenska/core/database/local_vehicle_database.dart';
 import 'package:svenska/core/services/automotive_date_encoder.dart';
+import 'package:svenska/core/services/print_history_refresh_notifier.dart';
 
 class LocalLabelService {
+  LocalLabelService(this._refreshNotifier);
+
+  final PrintHistoryRefreshNotifier _refreshNotifier;
   List<Map<String, dynamic>> listMasters() => LocalVehicleDatabase.getAllMasters();
 
   Map<String, dynamic> saveMaster(Map<String, dynamic> data) {
@@ -58,6 +62,26 @@ class LocalLabelService {
 
   List<Map<String, dynamic>> getPrintHistory({int limit = 200}) {
     return LocalVehicleDatabase.getAuditLogs(limit: limit);
+  }
+
+  List<Map<String, dynamic>> queryPrintHistory({
+    int limit = 5000,
+    DateTime? fromLocalDate,
+    DateTime? toLocalDate,
+    String? vehicleModel,
+    String? qrContains,
+    bool todayOnly = false,
+    DateTime? todayReference,
+  }) {
+    return LocalVehicleDatabase.queryPrintHistory(
+      limit: limit,
+      fromLocalDate: fromLocalDate,
+      toLocalDate: toLocalDate,
+      vehicleModel: vehicleModel,
+      qrContains: qrContains,
+      todayOnly: todayOnly,
+      todayReference: todayReference,
+    );
   }
 
   /// Builds 29-character QR payload and increments serial (same rules as vehicle_server).
@@ -121,6 +145,7 @@ class LocalLabelService {
       qrPayload: fullPayload,
       companyLogo: master['company_logo']?.toString() ?? 'none',
     );
+    _refreshNotifier.notifyPrintLogged();
 
     final targetPrinter = labelSize == '100x50'
         ? (LocalVehicleDatabase.getConfig('printer_100x50') ?? 'TSC TTP-244 Plus')

@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:svenska/core/database/local_vehicle_database.dart';
 import 'package:svenska/core/services/local_label_service.dart';
+import 'package:svenska/core/services/print_history_refresh_notifier.dart';
 
 void main() {
   late Directory tempDir;
@@ -13,7 +14,7 @@ void main() {
     LocalVehicleDatabase.dispose();
     tempDir = Directory.systemTemp.createTempSync('svenska_local_test_');
     LocalVehicleDatabase.init(databasePath: p.join(tempDir.path, 'test.db'));
-    service = LocalLabelService();
+    service = LocalLabelService(PrintHistoryRefreshNotifier());
   });
 
   tearDown(() {
@@ -90,7 +91,7 @@ void main() {
     final legacyPath = p.join(tempDir.path, 'legacy.db');
     LocalVehicleDatabase.dispose();
     LocalVehicleDatabase.init(databasePath: legacyPath);
-    final legacy = LocalLabelService();
+    final legacy = LocalLabelService(PrintHistoryRefreshNotifier());
     legacy.saveMaster({
       'vehicle_model': 'LEGACY-1',
       'customer_part_no': 'A',
@@ -101,7 +102,7 @@ void main() {
     LocalVehicleDatabase.dispose();
 
     LocalVehicleDatabase.init(databasePath: p.join(tempDir.path, 'main.db'));
-    service = LocalLabelService();
+    service = LocalLabelService(PrintHistoryRefreshNotifier());
     service.saveMaster({
       'vehicle_model': 'TEST-U350',
       'customer_part_no': 'X',
