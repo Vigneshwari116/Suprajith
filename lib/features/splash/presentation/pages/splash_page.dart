@@ -2,11 +2,13 @@ import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/constants/app_mode.dart';
+import '../../../../core/services/auth_service.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/services/client_discovery_helper.dart';
 import '../../../../core/services/server_config_storage.dart';
 import '../../../../core/utils/routes_name.dart';
-import '../../../../injection.dart'; // jahan sl define hai
+import '../../../../injection.dart';
 
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
@@ -16,7 +18,9 @@ class SplashPage extends StatefulWidget {
 }
 
 class _SplashPageState extends State<SplashPage> {
-  String _statusText = "Searching for Svenska Print Server...";
+  String _statusText = kUseLocalDataStore
+      ? 'Starting local label database...'
+      : 'Searching for Svenska Print Server...';
 
   @override
   void initState() {
@@ -25,23 +29,30 @@ class _SplashPageState extends State<SplashPage> {
   }
 
   Future<void> _startAppFlow() async {
+    if (kUseLocalDataStore) {
+      AuthService.ensureDefaultCredentials();
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+      if (!mounted) return;
+      final destination =
+          sl<AuthService>().isLoggedIn() ? AppRoutes.workstationMain : AppRoutes.login;
+      context.go(destination);
+      return;
+    }
+
     final configStorage = sl<ServerConfigStorage>();
 
-    // 1. Pehle Secure Storage se cached server URL read karein
     final cachedUrl = await configStorage.getServerUrl();
     sl<ApiClient>().updateBaseUrl(cachedUrl);
 
-    // 2. Background me UDP scan karein (Fresh Server check karne ke liye)
     if (!kIsWeb) {
       final discoveredUrl = await ClientDiscoveryHelper.findServer(
         timeout: const Duration(seconds: 2),
       );
 
       if (discoveredUrl != null && discoveredUrl != cachedUrl) {
-        // Naya IP mila toh ApiClient aur Secure Storage dono update karein
         sl<ApiClient>().updateBaseUrl(discoveredUrl);
         await configStorage.saveServerUrl(discoveredUrl);
-        debugPrint("✅ Secure Storage updated with Server: $discoveredUrl");
+        debugPrint("Secure Storage updated with Server: $discoveredUrl");
       }
     }
 
@@ -49,11 +60,12 @@ class _SplashPageState extends State<SplashPage> {
 
     final bool isDesktop = !kIsWeb && (Platform.isWindows || Platform.isMacOS || Platform.isLinux);
     if (kIsWeb || isDesktop) {
-      context.go(AppRoutes.desktopViewPage);
+      context.go(AppRoutes.workstationMain);
     } else {
-      context.go(AppRoutes.desktopViewPage);
+      context.go(AppRoutes.workstationMain);
     }
   }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(

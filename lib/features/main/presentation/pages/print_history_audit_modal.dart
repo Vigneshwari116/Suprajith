@@ -4,8 +4,11 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:svenska/features/main/presentation/pages/vehicle_models.dart';
+import '../../../../core/constants/app_mode.dart';
 import '../../../../core/constants/label_config.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/services/local_label_service.dart';
+import '../../../../core/utils/print_timestamp_formatter.dart';
 import '../../../../injection.dart';
 import 'frontend_label_engine.dart';
 import 'logo_assets_resolver.dart';
@@ -37,12 +40,11 @@ class _PrintHistoryAuditModalState extends State<PrintHistoryAuditModal> {
   Future<void> _loadGroupedHistory() async {
     setState(() => _isLoading = true);
     try {
-      final res = await sl<ApiClient>().get('/api/history');
-      if (res.statusCode == 200 && res.data['status'] == 'success') {
-        final List raw = res.data['data'] ?? [];
-        _rawHistoryList = raw.map((e) => PrintHistoryRecord.fromMap(e)).toList();
-        _applyDateFilters();
-      }
+      final List raw = kUseLocalDataStore
+          ? sl<LocalLabelService>().getPrintHistory()
+          : (await sl<ApiClient>().get('/api/history')).data['data'] as List? ?? [];
+      _rawHistoryList = raw.map((e) => PrintHistoryRecord.fromMap(e as Map<String, dynamic>)).toList();
+      _applyDateFilters();
     } catch (_) {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -53,39 +55,45 @@ class _PrintHistoryAuditModalState extends State<PrintHistoryAuditModal> {
 
     if (_fromDate != null || _toDate != null) {
       filtered = filtered.where((item) {
-        final datePart = item.printedAt.split(' ').first;
-        try {
-          final recordDate = DateFormat('dd.MM.yyyy').parse(datePart);
-          if (_fromDate != null && _toDate == null) {
-            return !recordDate.isBefore(DateTime(_fromDate!.year, _fromDate!.month, _fromDate!.day));
-          }
-          if (_fromDate == null && _toDate != null) {
-            return !recordDate.isAfter(DateTime(_toDate!.year, _toDate!.month, _toDate!.day, 23, 59, 59));
-          }
-          return !recordDate.isBefore(DateTime(_fromDate!.year, _fromDate!.month, _fromDate!.day)) &&
-              !recordDate.isAfter(DateTime(_toDate!.year, _toDate!.month, _toDate!.day, 23, 59, 59));
-        } catch (_) {
-          return false;
+        final recordDate = PrintTimestampFormatter.tryParsePrintedAt(item.printedAt);
+        if (recordDate == null) return false;
+        final day = DateTime(recordDate.year, recordDate.month, recordDate.day);
+        if (_fromDate != null && _toDate == null) {
+          return !day.isBefore(DateTime(_fromDate!.year, _fromDate!.month, _fromDate!.day));
         }
+        if (_fromDate == null && _toDate != null) {
+          return !day.isAfter(DateTime(_toDate!.year, _toDate!.month, _toDate!.day));
+        }
+        return !day.isBefore(DateTime(_fromDate!.year, _fromDate!.month, _fromDate!.day)) &&
+            !day.isAfter(DateTime(_toDate!.year, _toDate!.month, _toDate!.day));
       }).toList();
     }
 
-    Map<String, List<PrintHistoryRecord>> groups = {};
-    for (var item in filtered) {
-      String dateKey = item.printedAt.split(' ').first;
-      if (!groups.containsKey(dateKey)) {
-        groups[dateKey] = [];
-      }
-      groups[dateKey]!.add(item);
+    final groups = <String, List<PrintHistoryRecord>>{};
+    for (final item in filtered) {
+      final dateKey = PrintTimestampFormatter.groupDateLabel(item.printedAt);
+      groups.putIfAbsent(dateKey, () => []).add(item);
     }
 
-    groups.forEach((key, records) {
-      records.sort((a, b) => b.serialNo.compareTo(a.serialNo));
-    });
+    for (final records in groups.values) {
+      records.sort((a, b) {
+        final ta = PrintTimestampFormatter.tryParsePrintedAt(a.printedAt);
+        final tb = PrintTimestampFormatter.tryParsePrintedAt(b.printedAt);
+        if (ta != null && tb != null) return tb.compareTo(ta);
+        return b.serialNo.compareTo(a.serialNo);
+      });
+    }
 
     if (mounted) {
       setState(() {
-        _groupedHistory = groups;
+        final sortedEntries = groups.entries.toList()
+          ..sort((a, b) {
+            final da = PrintTimestampFormatter.tryParseGroupDateLabel(a.key);
+            final db = PrintTimestampFormatter.tryParseGroupDateLabel(b.key);
+            if (da != null && db != null) return db.compareTo(da);
+            return b.key.compareTo(a.key);
+          });
+        _groupedHistory = {for (final e in sortedEntries) e.key: e.value};
         _totalCount = filtered.length;
         _isLoading = false;
       });
@@ -157,13 +165,14 @@ class _PrintHistoryAuditModalState extends State<PrintHistoryAuditModal> {
 
     try {
       final logoImage = await LogoAssetResolver.getLogoImage(item.companyLogo);
+      final reprintMfgDate = DateFormat('dd.MM.yyyy').format(DateTime.now());
       final Uint8List pdfBytes;
       if (chosenSize == '100x50') {
         pdfBytes = await FrontendLabelEngine.build100x50Pdf(
           model: item.vehicleModel,
           custPart: item.customerPartNo,
           partNo: item.partNo,
-          mfgDate: item.dateOfMfg,
+          mfgDate: reprintMfgDate,
           serial: item.serialNo,
           qrPayload: item.fullQrData,
           logoImage: logoImage,
@@ -173,7 +182,7 @@ class _PrintHistoryAuditModalState extends State<PrintHistoryAuditModal> {
           model: item.vehicleModel,
           customerPartNo: item.customerPartNo,
           partNo: item.partNo,
-          mfgDate: item.dateOfMfg,
+          mfgDate: reprintMfgDate,
           qrPayload: item.fullQrData,
           logoImage: logoImage,
         );
@@ -417,9 +426,7 @@ class _PrintHistoryAuditModalState extends State<PrintHistoryAuditModal> {
                           ),
                         ),
                         ...records.map((item) {
-                          final timeStr = item.printedAt.split(' ').length > 1
-                              ? item.printedAt.split(' ')[1]
-                              : '';
+                          final timeStr = PrintTimestampFormatter.timeOfDayFromRaw(item.printedAt);
 
                           return Container(
                             margin: const EdgeInsets.only(bottom: 6),

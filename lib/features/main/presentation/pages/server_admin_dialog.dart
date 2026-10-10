@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/services/server_process_service.dart';
 import '../../../../injection.dart';
@@ -130,50 +129,13 @@ class ServerAdminDialog extends StatefulWidget {
 }
 
 class _ServerAdminDialogState extends State<ServerAdminDialog> {
-  final _pinCtrl = TextEditingController();
-
-  final _oldPinCtrl = TextEditingController();
-  final _newPinCtrl = TextEditingController();
-  final _confirmPinCtrl = TextEditingController();
-
-  bool _isUnlocked = false;
-  bool _isChangingPin = false;
   bool _isProcessing = false;
   late bool _isRunning;
-  String? _errorMsg;
-  String? _pinChangeMsg;
 
   @override
   void initState() {
     super.initState();
     _isRunning = widget.isCurrentlyRunning;
-  }
-
-  @override
-  void dispose() {
-    _pinCtrl.dispose();
-    _oldPinCtrl.dispose();
-    _newPinCtrl.dispose();
-    _confirmPinCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _verifyPin() async {
-    final entered = _pinCtrl.text.trim();
-    if (entered.length != 6) {
-      setState(() => _errorMsg = "Please enter full 6-digit PIN");
-      return;
-    }
-
-    final isValid = await ServerProcessService.verifyPin(entered);
-    if (isValid) {
-      setState(() {
-        _isUnlocked = true;
-        _errorMsg = null;
-      });
-    } else {
-      setState(() => _errorMsg = "Incorrect PIN!");
-    }
   }
 
   Future<void> _handleToggle() async {
@@ -191,46 +153,6 @@ class _ServerAdminDialogState extends State<ServerAdminDialog> {
 
     widget.onStateChanged();
     if (mounted) setState(() => _isProcessing = false);
-  }
-
-  Future<void> _submitPinChange() async {
-    final oldP = _oldPinCtrl.text.trim();
-    final newP = _newPinCtrl.text.trim();
-    final confP = _confirmPinCtrl.text.trim();
-
-    if (newP.length != 6 || int.tryParse(newP) == null) {
-      setState(() => _pinChangeMsg = "New PIN must be exactly 6 digits.");
-      return;
-    }
-    if (newP != confP) {
-      setState(() => _pinChangeMsg = "New PIN and Confirmation do not match!");
-      return;
-    }
-
-    final isOldCorrect = await ServerProcessService.verifyPin(oldP);
-    if (!isOldCorrect) {
-      setState(() => _pinChangeMsg = "Current PIN is incorrect!");
-      return;
-    }
-
-    final saved = await ServerProcessService.updatePin(newP);
-    if (saved) {
-      setState(() {
-        _isChangingPin = false;
-        _pinChangeMsg = null;
-        _oldPinCtrl.clear();
-        _newPinCtrl.clear();
-        _confirmPinCtrl.clear();
-      });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Supervisor PIN updated successfully!"),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    }
   }
 
   @override
@@ -260,91 +182,6 @@ class _ServerAdminDialogState extends State<ServerAdminDialog> {
               ],
             ),
             const Divider(height: 16),
-            if (!_isUnlocked) ...[
-              const Text(
-                "Enter 6-digit Supervisor PIN to control print server:",
-                style: TextStyle(fontSize: 11.5, color: Colors.black54),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _pinCtrl,
-                keyboardType: TextInputType.number,
-                obscureText: true,
-                maxLength: 6,
-                autofocus: true,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                onSubmitted: (_) => _verifyPin(),
-                decoration: InputDecoration(
-                  labelText: "6-Digit PIN",
-                  counterText: "",
-                  errorText: _errorMsg,
-                  border: const OutlineInputBorder(),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                ),
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F172A)),
-                  onPressed: _verifyPin,
-                  child: const Text("UNLOCK CONTROLS", style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-                ),
-              ),
-            ] else if (_isChangingPin) ...[
-              const Text("CHANGE 6-DIGIT SUPERVISOR PIN", style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 10),
-              TextField(
-                controller: _oldPinCtrl,
-                obscureText: true,
-                maxLength: 6,
-                keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                decoration: const InputDecoration(labelText: "Current PIN (or Master PIN)", counterText: "", border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _newPinCtrl,
-                obscureText: true,
-                maxLength: 6,
-                keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                decoration: const InputDecoration(labelText: "New 6-Digit PIN", counterText: "", border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _confirmPinCtrl,
-                obscureText: true,
-                maxLength: 6,
-                keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                decoration: const InputDecoration(labelText: "Confirm New PIN", counterText: "", border: OutlineInputBorder()),
-              ),
-              if (_pinChangeMsg != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: Text(_pinChangeMsg!, style: const TextStyle(color: Colors.red, fontSize: 11, fontWeight: FontWeight.bold)),
-                ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => setState(() => _isChangingPin = false),
-                      child: const Text("Cancel"),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB)),
-                      onPressed: _submitPinChange,
-                      child: const Text("SAVE PIN", style: TextStyle(color: Colors.white)),
-                    ),
-                  ),
-                ],
-              ),
-            ] else ...[
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -389,15 +226,6 @@ class _ServerAdminDialogState extends State<ServerAdminDialog> {
                       : Text(_isRunning ? "STOP SERVER" : "START SERVER"),
                 ),
               ),
-              const SizedBox(height: 10),
-              Center(
-                child: TextButton.icon(
-                  onPressed: () => setState(() => _isChangingPin = true),
-                  icon: const Icon(Icons.key_rounded, size: 16),
-                  label: const Text("Change Supervisor PIN", style: TextStyle(fontSize: 11)),
-                ),
-              ),
-            ],
           ],
         ),
       ),

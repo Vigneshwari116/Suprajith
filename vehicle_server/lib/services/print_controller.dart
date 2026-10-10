@@ -82,8 +82,11 @@ class PrintController {
         }, statusCode: 400);
       }
 
-      // Always use system date at print time for QR date encoding.
-      final activeDate = DateTime.now();
+      // QR date segment and label MFG use today's calendar date at print time (ignore master MFG).
+      final now = DateTime.now();
+      final activeDate = DateTime(now.year, now.month, now.day);
+      final mfgDateLabel =
+          '${activeDate.day.toString().padLeft(2, '0')}.${activeDate.month.toString().padLeft(2, '0')}.${activeDate.year}';
 
       // 2. Date code + Month code + 2-digit Year + Constant 'AA' -> e.g. 09.10.2026 = "9A26AA"
       final dateShiftCode = AutomotiveDateEncoder.encode(activeDate);
@@ -112,7 +115,7 @@ class PrintController {
         model: master['vehicle_model'],
         custPart: master['customer_part_no'] ?? '',
         partNo: master['part_no'] ?? '',
-        mfgDate: master['date_of_mfg'] ?? '',
+        mfgDate: mfgDateLabel,
         serial: serialStr,
         qrPayload: fullPayload,
         clientIp: clientIp,
@@ -131,7 +134,7 @@ class PrintController {
         'model': master['vehicle_model'],
         'customer_part_no': master['customer_part_no'] ?? '',
         'part_no': master['part_no'] ?? '',
-        'mfg_date': master['date_of_mfg'] ?? '',
+        'mfg_date': mfgDateLabel,
         'company_logo': master['company_logo'] ?? 'none',
       });
     } catch (e) {

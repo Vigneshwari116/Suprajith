@@ -57,6 +57,10 @@ dependencies:
   window_manager: ^0.5.1
   get: ^4.7.3
   qr_flutter: ^4.1.0
+  sqlite3: ^2.9.4
+  sqlite3_flutter_libs: ^0.5.28
+  path: ^1.9.1
+  crypto: ^3.0.7
 
 
 dev_dependencies:

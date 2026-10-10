@@ -6,16 +6,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:intl/intl.dart';
-import 'package:svenska/features/main/presentation/pages/print_history_audit_modal.dart';
-import 'package:svenska/features/main/presentation/pages/server_admin_dialog.dart';
 import 'package:svenska/features/main/presentation/pages/vehicle_models.dart';
+import '../../../../core/constants/app_mode.dart';
+import '../../../../core/services/automotive_date_encoder.dart';
+import '../../../../core/services/local_label_service.dart';
+import '../../../../core/services/printer_config_refresh_notifier.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../injection.dart';
-import 'dual_printer_settings_modal.dart';
 import 'frontend_label_engine.dart';
 import 'logo_assets_resolver.dart';
 import 'master_management_modal.dart';
 import '../../../../core/constants/label_config.dart';
+import 'today_prints_panel.dart';
 import 'u350_label_preview.dart';
 
 // THEME & COLOR PALETTE
@@ -55,21 +57,18 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
   String? _printer50x25 = 'TSC TTP-244 Plus';
   String? _printer100x50;
 
-  bool _isServerOnline = false;
-  Timer? _healthCheckTimer;
-
-  bool get _isHostMachine {
-    if (kIsWeb) return false;
-    return Platform.isWindows;
-  }
+  PrinterConfigRefreshNotifier? _printerConfigNotifier;
 
   @override
   void initState() {
     super.initState();
     _loadMasterRecords();
-    _fetchServerPrinterConfig();
-    _startLiveHealthPolling();
+    _loadPrinterConfig();
     _startTodayDateRefreshTimer();
+    if (kUseLocalDataStore) {
+      _printerConfigNotifier = sl<PrinterConfigRefreshNotifier>();
+      _printerConfigNotifier!.addListener(_loadPrinterConfig);
+    }
   }
 
   void _startTodayDateRefreshTimer() {
@@ -92,7 +91,7 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
 
   @override
   void dispose() {
-    _healthCheckTimer?.cancel();
+    _printerConfigNotifier?.removeListener(_loadPrinterConfig);
     _midnightRefreshTimer?.cancel();
     _modelInputCtrl.dispose();
     _fixedQrDisplayCtrl.dispose();
@@ -100,59 +99,40 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
     super.dispose();
   }
 
-  void _startLiveHealthPolling() {
-    _checkServerPing();
-    _healthCheckTimer = Timer.periodic(const Duration(seconds: 3), (_) {
-      _checkServerPing();
-    });
-  }
-
-  Future<void> _checkServerPing() async {
-    try {
-      final res = await sl<ApiClient>().get('/api/ping');
-      final isOnline = res.statusCode == 200 && res.data['status'] == 'online';
-      if (mounted && _isServerOnline != isOnline) {
-        setState(() {
-          _isServerOnline = isOnline;
-        });
-        if (isOnline) {
-          _loadMasterRecords();
-          _fetchServerPrinterConfig();
-        }
-      }
-    } catch (_) {
-      if (mounted && _isServerOnline) {
-        setState(() {
-          _isServerOnline = false;
-        });
-      }
-    }
-  }
-
   Future<void> _loadMasterRecords() async {
     try {
-      final res = await sl<ApiClient>().get('/api/masters');
-      if (res.statusCode == 200 && res.data['status'] == 'success') {
-        final List raw = res.data['data'] ?? [];
-        if (mounted) {
-          final list = raw.map((e) => VehicleMaster.fromMap(e)).toList();
+      final List raw = kUseLocalDataStore
+          ? sl<LocalLabelService>().listMasters()
+          : (await sl<ApiClient>().get('/api/masters')).data['data'] as List? ?? [];
+      if (mounted) {
+        final list = raw.map((e) => VehicleMaster.fromMap(e as Map<String, dynamic>)).toList();
 
-          // Deduplicate by vehicleModel to guarantee no duplicate dropdown assertion crashes
-          final uniqueMap = <String, VehicleMaster>{};
-          for (var item in list) {
-            uniqueMap[item.vehicleModel.trim().toLowerCase()] = item;
-          }
-
-          setState(() {
-            _masterList = uniqueMap.values.toList();
-          });
+        final uniqueMap = <String, VehicleMaster>{};
+        for (var item in list) {
+          uniqueMap[item.vehicleModel.trim().toLowerCase()] = item;
         }
+
+        setState(() {
+          _masterList = uniqueMap.values.toList();
+        });
       }
     } catch (_) {}
   }
 
-  Future<void> _fetchServerPrinterConfig() async {
+  Future<void> _loadPrinterConfig() async {
     try {
+      if (kUseLocalDataStore) {
+        final data = sl<LocalLabelService>().getPrinterConfig();
+        if (mounted) {
+          setState(() {
+            _printer50x25 = data['printer_50x25']?.toString().isNotEmpty == true
+                ? data['printer_50x25']?.toString()
+                : 'TSC TTP-244 Plus';
+            _printer100x50 = data['printer_100x50']?.toString();
+          });
+        }
+        return;
+      }
       final res = await sl<ApiClient>().get('/api/printer');
       if (res.statusCode == 200 && mounted) {
         setState(() {
@@ -212,11 +192,6 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
   }
 
   Future<void> _handleEnterAndPrint() async {
-    if (!_isServerOnline) {
-      _showToast("Cannot print: Server is currently OFFLINE / Unreachable.", isError: true);
-      return;
-    }
-
     final query = _modelInputCtrl.text.trim();
     if (query.isEmpty) {
       setState(() => _validationError = "Please scan or enter a Vehicle Model!");
@@ -259,28 +234,43 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
       _fixedQrDisplayCtrl.text = masterFixedQr;
     });
 
-    final printMoment = DateTime.now();
+    final printMoment = AutomotiveDateEncoder.calendarDateForPrint();
     final formattedDate = DateFormat('dd.MM.yyyy').format(printMoment);
     final targetPrinter = _selectedLabelSize == '100x50'
         ? (_printer100x50 ?? 'TSC TTP-244 Plus')
         : (_printer50x25 ?? 'TSC TTP-244 Plus');
 
     try {
-      final response = await sl<ApiClient>().post(
-        '/api/print',
-        data: {
-          'model': matched.vehicleModel,
-          'date': formattedDate,
-          'label_size': _selectedLabelSize,
-        },
-      );
+      final Map<String, dynamic> data;
+      if (kUseLocalDataStore) {
+        data = sl<LocalLabelService>().preparePrint(
+          modelQuery: matched.vehicleModel,
+          labelSize: _selectedLabelSize,
+          printAt: printMoment,
+        );
+      } else {
+        final response = await sl<ApiClient>().post(
+          '/api/print',
+          data: {
+            'model': matched.vehicleModel,
+            'date': formattedDate,
+            'label_size': _selectedLabelSize,
+          },
+        );
+        data = Map<String, dynamic>.from(response.data as Map);
+        if (response.statusCode != 200 || data['status'] != 'success') {
+          final err = data['message'] ?? 'Server could not prepare serial payload.';
+          _showToast("PRINT FAILED: $err", isError: true);
+          return;
+        }
+      }
 
-      final data = response.data;
-      if (response.statusCode == 200 && data['status'] == 'success') {
+      if (data['status'] == 'success') {
         final String serialStr = data['serial']?.toString() ?? '0001';
         final String fullPayload = data['full_payload']?.toString() ?? '';
 
         final logoImage = await LogoAssetResolver.getLogoImage(matched.companyLogo);
+        final labelMfgDate = data['mfg_date']?.toString() ?? formattedDate;
 
         final Uint8List pdfBytes;
         if (_selectedLabelSize == '100x50') {
@@ -288,7 +278,7 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
             model: matched.vehicleModel,
             custPart: matched.customerPartNo,
             partNo: matched.partNo,
-            mfgDate: formattedDate,
+            mfgDate: labelMfgDate,
             serial: serialStr,
             qrPayload: fullPayload,
             logoImage: logoImage,
@@ -298,7 +288,7 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
             model: matched.vehicleModel,
             customerPartNo: matched.customerPartNo,
             partNo: matched.partNo,
-            mfgDate: formattedDate,
+            mfgDate: labelMfgDate,
             qrPayload: fullPayload,
             logoImage: logoImage,
           );
@@ -317,7 +307,7 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
           'model': matched.vehicleModel,
           'customer_part_no': matched.customerPartNo,
           'part_no': matched.partNo,
-          'date_of_mfg': formattedDate,
+          'date_of_mfg': labelMfgDate,
           'qr_data': fullPayload,
           'sn': serialStr,
           'size': _selectedLabelSize,
@@ -382,78 +372,6 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
       barrierDismissible: false,
       builder: (ctx) => MasterManagementModal(
         onMasterUpdated: () => _loadMasterRecords(),
-      ),
-    );
-  }
-
-  void _openPrinterSettingsModal() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => DualPrinterSettingsModal(
-        currentPrinter50: _printer50x25,
-        currentPrinter100: _printer100x50,
-        onPrinterConfigured: () => _fetchServerPrinterConfig(),
-      ),
-    );
-  }
-
-  void _openHistoryModal() {
-    showDialog(
-      context: context,
-      builder: (ctx) => const PrintHistoryAuditModal(),
-    );
-  }
-
-  Widget _buildLiveServerBadge() {
-    return InkWell(
-      onTap: _isHostMachine
-          ? () async {
-        await showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (_) => ServerAdminDialog(
-            isCurrentlyRunning: _isServerOnline,
-            onStateChanged: _checkServerPing,
-          ),
-        );
-        _checkServerPing();
-      }
-          : () => _checkServerPing(),
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(
-          color: _isServerOnline ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
-          border: Border.all(color: _isServerOnline ? Colors.green : Colors.red, width: 1.2),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 8,
-              height: 8,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: _isServerOnline ? Colors.green : Colors.red,
-              ),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              _isServerOnline ? "ONLINE" : "OFFLINE",
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                color: _isServerOnline ? Colors.green.shade800 : Colors.red.shade800,
-              ),
-            ),
-            if (_isHostMachine) ...[
-              const SizedBox(width: 4),
-              Icon(Icons.settings, size: 12, color: _isServerOnline ? Colors.green.shade800 : Colors.red.shade800),
-            ],
-          ],
-        ),
       ),
     );
   }
@@ -585,7 +503,9 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
                 ),
                 Text(
                   formattedDate,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: kTextPrimary),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5, color: kTextPrimary),
                 ),
               ],
             ),
@@ -598,7 +518,7 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
   Widget _buildPrintButton() {
     return ElevatedButton.icon(
       style: ElevatedButton.styleFrom(
-        backgroundColor: _isServerOnline ? kAccent : Colors.grey,
+        backgroundColor: kAccent,
         foregroundColor: Colors.white,
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
@@ -942,48 +862,7 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
             ),
           ],
         ),
-        actions: [
-          _buildLiveServerBadge(),
-          const SizedBox(width: 8),
-          IconButton(
-            tooltip: "Print History",
-            onPressed: _openHistoryModal,
-            icon: const Icon(Icons.history_rounded, color: kTextSecondary),
-          ),
-          if (_isHostMachine)
-            IconButton(
-              tooltip: "Dual Printer Settings",
-              onPressed: _openPrinterSettingsModal,
-              icon: Icon(
-                Icons.print_outlined,
-                color: (_printer50x25 != null && _printer100x50 != null) ? kAccent : Colors.orange,
-              ),
-            ),
-          if (!isMobile) ...[
-            const SizedBox(width: 4),
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: kCardBg,
-                foregroundColor: kPrimary,
-                elevation: 0,
-                side: const BorderSide(color: kBorder, width: 1.2),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-              ),
-              onPressed: _openMasterModal,
-              icon: const Icon(Icons.shield_outlined, size: 16),
-              label: Text("MASTERS (${_masterList.length})", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
-            ),
-            const SizedBox(width: 16),
-          ] else ...[
-            IconButton(
-              tooltip: "Manage Masters",
-              onPressed: _openMasterModal,
-              icon: const Icon(Icons.shield_outlined, color: kPrimary),
-            ),
-            const SizedBox(width: 8),
-          ],
-        ],
+        actions: const [SizedBox(width: 8)],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
           child: Container(color: kBorder, height: 1),
@@ -1112,24 +991,27 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
             child: SingleChildScrollView(
               padding: EdgeInsets.all(isMobile ? 12 : 24),
               child: Center(
-                child: _activeLabelData == null
-                    ? Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                child: Column(
                   children: [
-                    const SizedBox(height: 60),
-                    Icon(Icons.print_outlined, size: isMobile ? 48 : 64, color: kTextSecondary.withOpacity(0.3)),
-                    const SizedBox(height: 12),
-                    const Text("Ready for Scanning",
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: kTextPrimary)),
-                    const SizedBox(height: 4),
-                    Text(
-                      "Scan or select Model and press ENTER to print directly to $_selectedLabelSize hardware.",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: kTextSecondary, fontSize: isMobile ? 12 : 13),
-                    ),
-                  ],
-                )
-                    : Column(
+                    if (_activeLabelData == null)
+                      Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const SizedBox(height: 60),
+                          Icon(Icons.print_outlined, size: isMobile ? 48 : 64, color: kTextSecondary.withOpacity(0.3)),
+                          const SizedBox(height: 12),
+                          const Text("Ready for Scanning",
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: kTextPrimary)),
+                          const SizedBox(height: 4),
+                          Text(
+                            "Scan or select Model and press ENTER to print directly to $_selectedLabelSize hardware.",
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: kTextSecondary, fontSize: isMobile ? 12 : 13),
+                          ),
+                        ],
+                      )
+                    else
+                      Column(
                   children: [
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -1172,6 +1054,10 @@ class _VehicleQRWorkstationPageState extends State<VehicleQRWorkstationPage> {
                               ),
                       ),
                     ),
+                  ],
+                ),
+                    const SizedBox(height: 20),
+                    const TodayPrintsPanel(),
                   ],
                 ),
               ),
