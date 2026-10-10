@@ -35,15 +35,27 @@ class _ReportsPageState extends State<ReportsPage> {
     _runReport();
   }
 
+  bool get _dateRangeActive => _fromDate != null || _toDate != null;
+
   void _runReport() {
     setState(() {
       _rows = sl<LocalLabelService>().queryPrintHistory(
         fromLocalDate: _fromDate,
         toLocalDate: _toDate,
         vehicleModel: _modelFilter,
+        todayOnly: !_dateRangeActive,
+        todayReference: DateTime.now(),
         limit: 20000,
       );
     });
+  }
+
+  void _clearDateRange() {
+    setState(() {
+      _fromDate = null;
+      _toDate = null;
+    });
+    _runReport();
   }
 
   Future<void> _exportCsv() async {
@@ -130,10 +142,24 @@ class _ReportsPageState extends State<ReportsPage> {
                     _runReport();
                   },
                 ),
+                if (_dateRangeActive)
+                  TextButton(
+                    onPressed: _clearDateRange,
+                    child: const Text('Show today only'),
+                  ),
                 ElevatedButton(onPressed: _isExporting ? null : _exportPdf, child: const Text('Export PDF')),
                 ElevatedButton(onPressed: _isExporting ? null : _exportCsv, child: const Text('Export CSV')),
               ],
             ),
+            if (!_dateRangeActive)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  "Showing today's prints (${DateFormat('dd-MM-yyyy').format(DateTime.now())}). "
+                  'Use From / To to view other dates.',
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                ),
+              ),
             const SizedBox(height: 12),
             Expanded(
               child: Card(

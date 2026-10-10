@@ -21,5 +21,7 @@ void main() {
     final text = utf8.decode(bytes);
     expect(text, contains('0000N822126000203659A26AA0001'));
     expect(text, contains('=""0000N822126000203659A26AA0001""'));
+    expect(text, contains('=""09-10-2026""'));
+    expect(text, contains('=""12:00:00""'));
   });
 }
